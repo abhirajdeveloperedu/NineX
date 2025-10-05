@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NineX - Elite Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="https://i.ibb.co/dwXRGNMJ/20250923-230042-2.png">
+    <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+    <div class="background-overlay"></div>
+    <div class="container">
+        <div id="loginSection">
+            <div class="header">
+                <div class="logo">
+                    <img src="https://i.ibb.co/dwXRGNMJ/20250923-230042-2.png" alt="NineX Logo" class="logo-image">
+                    <div class="logo-text">NineX</div>
+                </div>
+            </div>
+            <div class="login-container">
+                <div class="login-card">
+                    <div class="login-header">
+                        <img src="https://i.ibb.co/dwXRGNMJ/20250923-230042-2.png" alt="NineX Logo" class="logo-image" style="width: 60px; height: 60px; margin: 0 auto 1rem; display: block;">
+                        <h1 class="login-title">NineX</h1>
+                        <p class="login-subtitle">Full Secure Administrator Login</p>
+                    </div>
+                    <form id="loginForm" autocomplete="off">
+                        <div class="form-group">
+                            <label for="loginUsername" class="form-label">Access Key</label>
+                            <input type="text" id="loginUsername" class="form-input" placeholder="Enter your access key" autocomplete="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword" class="form-label">Password</label>
+                            <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password" required>
+                        </div>
+                        <button type="submit" class="btn-primary"><span>Continue</span></button>
+                    </form>
+                    <form id="otpForm" autocomplete="off" style="display: none;">
+                         <p class="login-subtitle" style="margin-bottom: 1rem;">An OTP has been sent to your Telegram. Please enter it below.</p>
+                        <div class="form-group">
+                            <label for="loginOtp" class="form-label">One-Time Password (OTP)</label>
+                            <input type="text" id="loginOtp" inputmode="numeric" class="form-input" placeholder="Enter OTP from Telegram" required>
+                        </div>
+                        <button type="submit" class="btn-primary"><span>Enter NineX Panel</span></button>
+                    </form>
+                    <div class="forgot-password-link">
+                        <a href="#" id="forgotPasswordLink">Forgot Password?</a>
+                    </div>
+                    <div class="register-link" style="margin-top: 0.75rem;">
+                        <a href="https://t.me/Infinityteampro1" target="_blank" rel="noopener" class="btn-register"><span>Register</span></a>
+                    </div>
+                    <div id="loginError" class="error-message" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboardSection" style="display: none;">
+            <header class="header">
+                <div class="logo">
+                    <img src="https://i.ibb.co/dwXRGNMJ/20250923-230042-2.png" alt="NineX Logo" class="logo-image">
+                    <div class="logo-text">NineX</div>
+                </div>
+                <div class="user-info">
+                    <div class="badge badge-gold" id="userTypeBadge"></div>
+                    <div class="badge badge-green" id="creditsBadge" style="display: none;">Credits: <span id="userCredits"></span></div>
+                    <span id="welcomeUser" class="welcome-text"></span>
+                    <button class="btn-secondary" id="resetAllKeysBtn" style="display: none;"><span>Reset All Keys</span></button>
+                    <button class="btn-secondary" id="extendAllUsersBtn" style="display: none;"><span>Extend All Users</span></button>
+                    <button class="logout-btn" onclick="app.logout()"><span>Logout</span></button>
+                </div>
+            </header>
+            <main class="dashboard">
+                <section class="card">
+                    <h2 class="card-title">Create Account</h2>
+                    <form id="createUserForm" autocomplete="off">
+                        <div class="form-group"><label for="newUsername" class="form-label">Username</label><input type="text" id="newUsername" class="form-input" required></div>
+                        <div class="form-group"><label for="newPassword" class="form-label">Password</label><input type="text" id="newPassword" class="form-input" required></div>
+                        <div class="form-group"><label for="expiryPeriod" class="form-label">Expiry Period</label><select id="expiryPeriod" class="form-select" required></select></div>
+                        <div class="form-group"><label for="deviceType" class="form-label">Device Type</label><select id="deviceType" class="form-select" required></select></div>
+                        <div class="form-group"><label for="accountType" class="form-label">Account Type</label><select id="accountType" class="form-select"></select></div>
+                        <div class="form-group" id="creditsGroup" style="display: none;"><label for="creditsToGive" class="form-label">Credits to Give</label><input type="number" id="creditsToGive" class="form-input" value="10" min="0"></div>
+                        
+                        <div class="form-group" id="telegramIdGroup" style="display: none;"><label for="newTelegramId" class="form-label">Telegram ID</label><input type="text" id="newTelegramId" class="form-input" placeholder="Required for Seller/Reseller"></div>
+
+                        <button type="submit" class="btn-primary" id="createUserBtn"><span>Create</span></button>
+                    </form>
+                </section>
+                <section class="card">
+                    <h2 class="card-title">Statistics</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item"><div class="stat-number" id="totalUsers">0</div><div class="stat-label">Total Users</div></div>
+                        <div class="stat-item"><div class="stat-number" id="activeUsers">0</div><div class="stat-label">Active Users</div></div>
+                        <div class="stat-item"><div class="stat-number" id="expiredUsers">0</div><div class="stat-label">Expired Users</div></div>
+                        <div class="stat-item"><div class="stat-number" id="resellerCount">0</div><div class="stat-label">Resellers</div></div>
+                    </div>
+                    <button class="btn-primary" onclick="app.loadUsers()" style="margin-top: 1rem;"><span>Refresh</span></button>
+                </section>
+            </main>
+            <section class="table-container">
+                <h2 class="card-title">User Management</h2>
+                <div class="table-controls">
+                    <input type="text" id="searchInput" class="form-input" placeholder="Search username...">
+                    <button type="button" id="searchBtn" class="btn-secondary">Search</button>
+                    <select id="sortSelect" class="form-select">
+                        <option value="latest" selected>Latest → Oldest</option>
+                        <option value="oldest">Oldest → Latest</option>
+                        <option value="az">Username A → Z</option>
+                        <option value="za">Username Z → A</option>
+                    </select>
+                </div>
+                <div class="loading" id="loadingUsers"><div class="spinner"></div><p>Loading users...</p></div>
+                <div class="table-wrapper">
+                    <table class="table" id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>Username</th><th>Password</th><th>Type</th><th>Credits</th>
+                                <th>Expiry</th><th>Device</th><th>HWID</th><th>Created By</th>
+                                <th>Status</th><th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination-bar">
+                    <div class="rows-per-page">
+                        <span>Rows per page:</span>
+                        <select id="rowsPerPageSelect" class="form-select">
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="page-info" id="pageInfo">0 – 0 of 0</div>
+                    <div class="pager-buttons">
+                        <button id="prevPageBtn" class="icon-btn" aria-label="Previous page">‹</button>
+                        <button id="nextPageBtn" class="icon-btn" aria-label="Next page">›</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="resetPasswordModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <button class="modal-close-btn" id="closeModalBtn">&times;</button>
+            <div id="resetStep1">
+                <h2 class="login-title">Reset Password</h2>
+                <p class="login-subtitle">Enter your details to receive an OTP on Telegram.</p>
+                <form id="requestOtpForm" autocomplete="off">
+                    <div class="form-group">
+                        <label for="resetUsername" class="form-label">Username</label>
+                        <input type="text" id="resetUsername" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="telegramId" class="form-label">Your Telegram ID</label>
+                        <input type="text" id="telegramId" class="form-input" required>
+                    </div>
+                    <button type="submit" class="btn-primary"><span>Send OTP</span></button>
+                </form>
+            </div>
+            <div id="resetStep2" style="display: none;">
+                <h2 class="login-title">Verify OTP</h2>
+                <p class="login-subtitle">An OTP has been sent. It's valid for 5 minutes.</p>
+                <form id="verifyOtpForm" autocomplete="off">
+                    <div class="form-group">
+                        <label for="otp" class="form-label">OTP</label>
+                        <input type="text" id="otp" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPasswordReset" class="form-label">New Password</label>
+                        <input type="password" id="newPasswordReset" class="form-input" required>
+                    </div>
+                    <button type="submit" class="btn-primary"><span>Reset Password</span></button>
+                </form>
+            </div>
+            <div id="resetError" class="error-message" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <div id="notification" class="notification" role="alert" aria-live="polite"></div>
+    <script src="config/config.js"></script>
+    <script src="assets/js/app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js')); }
+    </script>
+</body>
+</html>
