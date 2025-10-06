@@ -16,7 +16,6 @@ const CONFIG = {
     CREDITS: {
         // UPDATED PRICING TO MATCH NEW REQUIREMENTS
         PRICING: {
-            '120': 0.5,      // 5 days (single)
             '240': 1,        // 10 days (single)
             '480': 2,        // 20 days (single)
             '720': 3,        // 30 days (single)
