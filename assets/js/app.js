@@ -336,7 +336,6 @@ class NineXAdminPanel {
                 <option value="0.08333">5 Minutes</option>
                 <option value="1">1 Hour</option>
                 <option value="24">1 Day</option>
-                <option value="120">5 Days</option>
                 <option value="240" selected>10 Days</option>
                 <option value="480">20 Days</option>
                 <option value="720">30 Days</option>
@@ -344,14 +343,12 @@ class NineXAdminPanel {
         } else if (AccountType === 'admin') {
             // Admin: standard choices only (no short durations or Never)
             expiryEl.innerHTML = `
-                <option value="120">5 Days</option>
                 <option value="240" selected>10 Days</option>
                 <option value="480">20 Days</option>
                 <option value="720">30 Days</option>`;
         } else {
             // Seller/Reseller creating users: standard choices
             expiryEl.innerHTML = `
-                <option value="120">5 Days</option>
                 <option value="240" selected>10 Days</option>
                 <option value="480">20 Days</option>
                 <option value="720">30 Days</option>`;
