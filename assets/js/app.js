@@ -314,8 +314,10 @@ class NineXAdminPanel {
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('dashboardSection').style.display = 'block';
             this.setupPermissions();
-            this.computeAllowedCreators().then(() => this.loadUsers());
-            this.checkMaintenanceState(); // --- NEW ---
+            // Chain the async functions properly
+            this.computeAllowedCreators()
+                .then(() => this.loadUsers())
+                .then(() => this.checkMaintenanceState()); // --- UPDATED ---
         }
     }
     async setupPermissions() { /* ... UPDATED BUSINESS RULES ... */ 
@@ -928,11 +930,13 @@ class NineXAdminPanel {
     }
 
     // ---
-    // --- NEW MAINTENANCE MODE FUNCTIONS ---
+    // --- NEW MAINTENANCE MODE FUNCTIONS (checkMaintenanceState is modified) ---
     // ---
 
     /**
      * Checks the maintenance state by fetching one user record.
+     * --- MODIFIED: This function no longer uses an access filter ---
+     * It checks the *global* state by fetching the first record in the table.
      */
     async checkMaintenanceState() {
         this.updateMaintenanceUI('Checking...');
@@ -942,10 +946,9 @@ class NineXAdminPanel {
             params.set('pageSize', '1');
             params.append('fields[]', 'Version'); // We only need the Version field
             
-            // Apply access filter. A 'god' will have no filter. An 'admin' will check one of their own users.
-            const accessOnly = this.buildFilterFormula(false);
-            if (accessOnly) params.set('filterByFormula', accessOnly);
-
+            // --- REMOVED FILTER ---
+            // This now checks the absolute first record in the table,
+            // giving a true global maintenance state.
             let url = `${base}?${params.toString()}`;
 
             const data = await this.secureFetch(url);
