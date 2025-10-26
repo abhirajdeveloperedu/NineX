@@ -69,6 +69,9 @@
                     <div class="badge badge-gold" id="userTypeBadge"></div>
                     <div class="badge badge-green" id="creditsBadge" style="display: none;">Credits: <span id="userCredits"></span></div>
                     <span id="welcomeUser" class="welcome-text"></span>
+                    
+                    <div class="badge" id="serverStatusBadge" style="background-color: var(--warning); color: var(--dark-bg); font-weight: 700;">Status: <span id="serverStatusText">Checking...</span></div>
+                    <button class="btn-secondary" id="maintenanceToggleBtn" style="display: none; background-color: var(--warning); color: var(--dark-bg);"><span>Toggle Maintenance</span></button>
                     <button class="btn-secondary" id="resetAllKeysBtn" style="display: none;"><span>Reset All Keys</span></button>
                     <button class="btn-secondary" id="extendAllUsersBtn" style="display: none;"><span>Extend All Users</span></button>
                     <button class="logout-btn" onclick="app.logout()"><span>Logout</span></button>
