@@ -8,6 +8,11 @@ class NineXAdminPanel {
         this.loginUsername = null; 
         this.resetUsername = null; 
         this.allowedCreators = null; // hierarchy-based list of creator usernames current user can view; null => unrestricted (god)
+        
+        // --- NEW ---
+        this.maintenanceState = null; // null = unknown, 'v3' = online, 'Maintenance' = offline
+        // --- END NEW ---
+
         // Pagination, search, sort state
         this.currentPage = 1;
         this.rowsPerPage = 50;
@@ -172,6 +177,11 @@ class NineXAdminPanel {
         document.getElementById('resetAllKeysBtn')?.addEventListener('click', () => this.resetAllKeys());
         // Admin/God: Extend All Users button
         document.getElementById('extendAllUsersBtn')?.addEventListener('click', () => this.extendAllUsers());
+        
+        // --- NEW ---
+        // Admin/God: Maintenance Mode button
+        document.getElementById('maintenanceToggleBtn')?.addEventListener('click', () => this.toggleMaintenanceMode());
+        // --- END NEW ---
     }
 
     async handlePasswordSubmit(e) { /* ... UNCHANGED ... */ 
@@ -200,7 +210,7 @@ class NineXAdminPanel {
             btn.disabled = false; btn.querySelector('span').textContent = 'Continue';
         }
     }
-    async handleOtpSubmit(e) { /* ... UNCHANGED ... */ 
+    async handleOtpSubmit(e) { /* ... UPDATED ... */ 
         e.preventDefault();
         this.showError('');
         const form = e.target;
@@ -224,6 +234,7 @@ class NineXAdminPanel {
                 await this.setupPermissions();
                 await this.computeAllowedCreators();
                 await this.loadUsers();
+                await this.checkMaintenanceState(); // --- NEW ---
                 this.showNotification('Login successful!', 'success');
             } else {
                  this.showError('Login failed. Please try again.');
@@ -296,7 +307,7 @@ class NineXAdminPanel {
         }
     }
     
-    checkExistingSession() { /* ... UNCHANGED ... */ 
+    checkExistingSession() { /* ... UPDATED ... */ 
         const session = validateSession();
         if (session) {
             this.currentUser = session.user;
@@ -304,6 +315,7 @@ class NineXAdminPanel {
             document.getElementById('dashboardSection').style.display = 'block';
             this.setupPermissions();
             this.computeAllowedCreators().then(() => this.loadUsers());
+            this.checkMaintenanceState(); // --- NEW ---
         }
     }
     async setupPermissions() { /* ... UPDATED BUSINESS RULES ... */ 
@@ -329,6 +341,15 @@ class NineXAdminPanel {
         if (extendBtn) {
             extendBtn.style.display = (AccountType === 'god' || AccountType === 'admin') ? 'inline-flex' : 'none';
         }
+
+        // --- NEW ---
+        // Toggle Maintenance Mode button visibility based on role
+        const maintenanceBtn = document.getElementById('maintenanceToggleBtn');
+        if (maintenanceBtn) {
+            maintenanceBtn.style.display = (AccountType === 'god' || AccountType === 'admin') ? 'inline-flex' : 'none';
+        }
+        // --- END NEW ---
+
         const expiryEl = document.getElementById('expiryPeriod');
         if (AccountType === 'god') {
             // God: full set including short durations and Never
@@ -504,6 +525,12 @@ class NineXAdminPanel {
         userData.Expiry = isPrivileged ? '9999' : String(Math.floor(Date.now() / 1000) + Math.floor(parseFloat(userData.Expiry) * 3600));
         userData.CreatedBy = this.currentUser.Username;
         userData.HWID = ''; userData.HWID2 = '';
+        
+        // --- NEW ---
+        // Ensure new user's version matches the current server state
+        userData.Version = this.maintenanceState || 'v3'; 
+        // --- END NEW ---
+
         await this.secureFetch(this.config.API.BASE_URL, { method: 'POST', body: { records: [{ fields: userData }] } });
         if (cost > 0) {
             this.currentUser.Credits -= cost;
@@ -899,5 +926,191 @@ class NineXAdminPanel {
         el.textContent = message; el.className = `notification ${type} show`;
         setTimeout(() => el.classList.remove('show'), 3000);
     }
+
+    // ---
+    // --- NEW MAINTENANCE MODE FUNCTIONS ---
+    // ---
+
+    /**
+     * Checks the maintenance state by fetching one user record.
+     */
+    async checkMaintenanceState() {
+        this.updateMaintenanceUI('Checking...');
+        try {
+            const base = this.config.API.BASE_URL;
+            const params = new URLSearchParams();
+            params.set('pageSize', '1');
+            params.append('fields[]', 'Version'); // We only need the Version field
+            
+            // Apply access filter. A 'god' will have no filter. An 'admin' will check one of their own users.
+            const accessOnly = this.buildFilterFormula(false);
+            if (accessOnly) params.set('filterByFormula', accessOnly);
+
+            let url = `${base}?${params.toString()}`;
+
+            const data = await this.secureFetch(url);
+            let state = 'v3'; // Default to 'v3' (Online)
+            if (data.records && data.records.length > 0) {
+                const firstUser = data.records[0].fields;
+                if (firstUser.Version === 'Maintenance') {
+                    state = 'Maintenance';
+                }
+            }
+            this.maintenanceState = state;
+            this.updateMaintenanceUI(state);
+        } catch (error) {
+            this.showNotification('Could not check server state: ' + error.message, 'error');
+            this.updateMaintenanceUI('Error');
+        }
+    }
+
+    /**
+     * Updates the UI elements (badge, button) to reflect the current maintenance state.
+     * @param {string} state - The current state ('v3', 'Maintenance', 'Checking...', 'Error')
+     */
+    updateMaintenanceUI(state) {
+        const statusText = document.getElementById('serverStatusText');
+        const statusBadge = document.getElementById('serverStatusBadge');
+        const btn = document.getElementById('maintenanceToggleBtn');
+        const btnSpan = btn?.querySelector('span');
+
+        if (!statusText || !statusBadge) return;
+
+        switch (state) {
+            case 'Maintenance':
+                statusText.textContent = 'Maintenance';
+                statusBadge.style.backgroundColor = 'var(--error)'; // Red
+                statusBadge.style.color = 'white';
+                if (btn) {
+                    btn.style.backgroundColor = 'var(--success)';
+                    btn.style.color = 'white';
+                    if (btnSpan) btnSpan.textContent = 'Disable Maintenance (Go Online)';
+                }
+                break;
+            case 'v3':
+                statusText.textContent = 'Online';
+                statusBadge.style.backgroundColor = 'var(--success)'; // Green
+                statusBadge.style.color = 'white';
+                 if (btn) {
+                    btn.style.backgroundColor = 'var(--warning)';
+                    btn.style.color = 'var(--dark-bg)';
+                    if (btnSpan) btnSpan.textContent = 'Enable Maintenance (Go Offline)';
+                }
+                break;
+            case 'Checking...':
+                statusText.textContent = 'Checking...';
+                statusBadge.style.backgroundColor = 'var(--warning)'; // Yellow
+                statusBadge.style.color = 'var(--dark-bg)';
+                if (btn) {
+                    btn.style.backgroundColor = 'var(--warning)';
+                    btn.style.color = 'var(--dark-bg)';
+                    if (btnSpan) btnSpan.textContent = 'Checking State...';
+                }
+                break;
+            default: // Error or unknown
+                statusText.textContent = 'Unknown';
+                statusBadge.style.backgroundColor = '#888'; // Grey
+                statusBadge.style.color = 'white';
+                if (btn) {
+                    btn.style.backgroundColor = '#888';
+                    btn.style.color = 'white';
+                    if (btnSpan) btnSpan.textContent = 'Check State Failed';
+                }
+        }
+    }
+
+    /**
+     * Handles the click event for the maintenance toggle button.
+     */
+    async toggleMaintenanceMode() {
+        if (this.maintenanceState === null || this.maintenanceState === 'Checking...') {
+            this.showNotification('Still checking current state. Please wait.', 'error');
+            return;
+        }
+
+        const currentState = this.maintenanceState;
+        const newState = (currentState === 'v3') ? 'Maintenance' : 'v3';
+        const action = (newState === 'Maintenance') ? 'ENABLE maintenance mode' : 'DISABLE maintenance mode (go online)';
+        const scopeLabel = this.currentUser.AccountType === 'god' ? 'ALL users' : 'all users you can access';
+
+        if (!confirm(`Are you sure you want to ${action} for ${scopeLabel}?`)) return;
+
+        const btn = document.getElementById('maintenanceToggleBtn');
+        if (btn) btn.disabled = true;
+        this.updateMaintenanceUI('Checking...'); // Show "Checking..." as a loading state
+
+        try {
+            await this.setAllUsersVersion(newState);
+            this.maintenanceState = newState;
+            this.updateMaintenanceUI(newState);
+            this.showNotification(`Successfully set ${scopeLabel} to '${newState}'.`, 'success');
+        } catch (error) {
+            this.showNotification('Failed to update user versions: ' + error.message, 'error');
+            // Revert UI to the state it was before the failed attempt
+            this.updateMaintenanceUI(currentState);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    /**
+     * Fetches all accessible user records and batch-updates their 'Version' field.
+     * @param {string} newVersion - The new version string ('v3' or 'Maintenance')
+     */
+    async setAllUsersVersion(newVersion) {
+        // Only admin or god may perform this action
+        if (!(this.currentUser?.AccountType === 'god' || this.currentUser?.AccountType === 'admin')) {
+            throw new Error('You do not have permission to perform this action.');
+        }
+
+        const base = this.config.API.BASE_URL;
+        const params = new URLSearchParams();
+        params.set('pageSize', '100');
+
+        // Apply access filter. 'god' has no filter and updates all.
+        // 'admin' updates all users they and their subordinates created.
+        const accessOnly = this.buildFilterFormula(false);
+        if (accessOnly) params.set('filterByFormula', accessOnly);
+
+        // Request minimal fields (just need ID)
+        params.append('fields[]', 'Username');
+        let url = `${base}?${params.toString()}`;
+
+        const recordsToUpdate = [];
+        let guard = 0;
+        while (true) {
+            const data = await this.secureFetch(url);
+            const recs = data.records || [];
+            for (const r of recs) {
+                recordsToUpdate.push({ id: r.id });
+            }
+            if (data.offset && guard < 200) { // 200 page guard
+                const u = new URL(url);
+                u.searchParams.set('offset', data.offset);
+                url = u.toString();
+                guard++;
+            } else { break; }
+        }
+
+        if (recordsToUpdate.length === 0) {
+            // This is not an error, just no users to update.
+            return;
+        }
+
+        // Batch PATCH in chunks of 10
+        const chunkSize = 10;
+        let processed = 0;
+        for (let i = 0; i < recordsToUpdate.length; i += chunkSize) {
+            const batch = recordsToUpdate.slice(i, i + chunkSize).map(r => ({
+                id: r.id,
+                fields: { Version: newVersion }
+            }));
+            await this.secureFetch(base, { method: 'PATCH', body: { records: batch } });
+            processed += batch.length;
+        }
+        
+        console.log(`Updated ${processed} users to ${newVersion}.`);
+    }
+
 }
 const app = new NineXAdminPanel();
