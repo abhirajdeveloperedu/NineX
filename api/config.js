@@ -1,4 +1,4 @@
-// NineX - Secure Config Management API (God Account Only)
+// NineX - Secure Config Management API (God Account Only - v2 Dynamic URL)
 export default async function handler(request, response) {
     // Enable CORS for app requests
     response.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,11 +10,15 @@ export default async function handler(request, response) {
     }
 
     const AIRTABLE_TOKEN = process.env.AIRTABLE_API_TOKEN;
-    const AIRTABLE_BASE_URL = process.env.AIRTABLE_BASE_URL || '';
+    const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+    const AIRTABLE_TABLE_ID = process.env.AIRTABLE_TABLE_ID;
 
-    if (!AIRTABLE_TOKEN) {
-        return response.status(500).json({ error: 'Server configuration error' });
+    if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_ID) {
+        return response.status(500).json({ error: 'Server configuration error - missing environment variables' });
     }
+
+    // Construct the base URL dynamically
+    const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`;
 
     try {
         // GET: Return current config (for app to fetch)
@@ -25,10 +29,13 @@ export default async function handler(request, response) {
 
         // POST: Validate proposed credentials and return instructions to update env vars in Vercel
         if (request.method === 'POST') {
-            const { newToken, newBaseUrl } = request.body || {};
-            if (!newToken || !newBaseUrl) {
-                return response.status(400).json({ error: 'Missing required fields: newToken, newBaseUrl' });
+            const { newToken, newBaseId, newTableId } = request.body || {};
+            if (!newToken || !newBaseId || !newTableId) {
+                return response.status(400).json({ error: 'Missing required fields: newToken, newBaseId, newTableId' });
             }
+
+            // Construct the full URL for validation
+            const newBaseUrl = `https://api.airtable.com/v0/${newBaseId}/${newTableId}`;
 
             // Validate new credentials by testing them
             try {
@@ -38,7 +45,7 @@ export default async function handler(request, response) {
                 });
 
                 if (!testRes.ok) {
-                    return response.status(400).json({ error: 'Invalid Airtable credentials. Please verify token and base URL.' });
+                    return response.status(400).json({ error: 'Invalid Airtable credentials. Please verify token, base ID, and table ID.' });
                 }
             } catch (err) {
                 return response.status(400).json({ error: 'Failed to validate new credentials: ' + err.message });
@@ -50,9 +57,12 @@ export default async function handler(request, response) {
                 message: 'Credentials validated successfully',
                 instructions: 'Please update the following environment variables in Vercel:\n' +
                              `AIRTABLE_API_TOKEN=${newToken}\n` +
-                             `AIRTABLE_BASE_URL=${newBaseUrl}\n\n` +
+                             `AIRTABLE_BASE_ID=${newBaseId}\n` +
+                             `AIRTABLE_TABLE_ID=${newTableId}\n\n` +
                              'After updating, redeploy the application.',
                 newToken,
+                newBaseId,
+                newTableId,
                 newBaseUrl
             });
         }
