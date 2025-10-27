@@ -1,8 +1,9 @@
-// NineX - Secure Password Reset API (v9 - Hardened Airtable Logic)
+// NineX - Secure Password Reset API (v10 - Dynamic URL Construction)
 export default async function handler(request, response) {
     const AIRTABLE_TOKEN = process.env.AIRTABLE_API_TOKEN;
     const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-    const AIRTABLE_BASE_URL = process.env.AIRTABLE_BASE_URL || 'https://api.airtable.com/v0/appvf5cnySuHpWua4/tblCXb53fbuDTHt0E';
+    const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+    const AIRTABLE_TABLE_ID = process.env.AIRTABLE_TABLE_ID;
 
     if (!AIRTABLE_TOKEN) {
         return response.status(500).json({ error: { message: "Configuration Error: Airtable API Token is not set on the server." } });
@@ -10,6 +11,12 @@ export default async function handler(request, response) {
     if (!TELEGRAM_BOT_TOKEN) {
         return response.status(500).json({ error: { message: "Configuration Error: Telegram Bot Token is not set on the server." } });
     }
+    if (!AIRTABLE_BASE_ID || !AIRTABLE_TABLE_ID) {
+        return response.status(500).json({ error: { message: "Configuration Error: Airtable Base ID or Table ID is not set on the server." } });
+    }
+
+    // Construct the base URL dynamically from environment variables
+    const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`;
 
     const { username, telegramId, otp, newPassword } = request.body;
 
