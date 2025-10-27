@@ -1,50 +1,66 @@
-// NineX - Secure Configuration (v11 - Final with New Credits)
-const PROXY_URL = '/api/proxy';
-let AIRTABLE_BASE_URL = '';
+// NineX - Secure Config Management API (God Account Only)
+export default async function handler(request, response) {
+    // Enable CORS for app requests
+    response.setHeader('Access-Control-Allow-Origin', '*');
+    response.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+    response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-const CONFIG = {
-    API: { PROXY_URL, BASE_URL: AIRTABLE_BASE_URL },
-    SECURITY: { SESSION_TIMEOUT: 3600000 },
-    HIERARCHY: {
-        PERMISSIONS: {
-            god: ['create_all', 'create_admin', 'create_seller', 'create_reseller', 'create_user'],
-            admin: ['create_seller', 'create_reseller', 'create_user'],
-            seller: ['create_reseller', 'create_user'],
-            reseller: ['create_user']
-        }
-    },
-    CREDITS: {
-        // UPDATED PRICING TO MATCH NEW REQUIREMENTS
-        PRICING: {
-            '240': 1,        // 10 days (single)
-            '480': 2,        // 20 days (single)
-            '720': 3,        // 30 days (single)
-            // Admin/God only options (short durations + Never)
-            '0.08333': 0.5,  // 5 minutes
-            '1': 1,          // 1 hour
-            '24': 2,         // 1 day
-            '9999': 100
-        },
-        DEVICE_MULTIPLIER: {
-            'single': 1,
-            'double': 2,
-            'unlimited': 4 
-        }
+    if (request.method === 'OPTIONS') {
+        return response.status(200).end();
     }
-};
 
-function validateSession() {
-    const session = localStorage.getItem('ninex_session');
-    if (!session) return null;
+    const AIRTABLE_TOKEN = process.env.AIRTABLE_API_TOKEN;
+    const AIRTABLE_BASE_URL = process.env.AIRTABLE_BASE_URL || '';
+
+    if (!AIRTABLE_TOKEN) {
+        return response.status(500).json({ error: 'Server configuration error' });
+    }
+
     try {
-        const data = JSON.parse(atob(session));
-        if (Date.now() - data.timestamp > CONFIG.SECURITY.SESSION_TIMEOUT) {
-            localStorage.removeItem('ninex_session'); return null;
+        // GET: Return current config (for app to fetch)
+        if (request.method === 'GET') {
+            const configData = `${AIRTABLE_TOKEN}\n${AIRTABLE_BASE_URL}`;
+            return response.status(200).send(configData);
         }
-        return data;
-    } catch (e) { localStorage.removeItem('ninex_session'); return null; }
-}
 
-function createSession(userData) {
-    localStorage.setItem('ninex_session', btoa(JSON.stringify({ user: userData, timestamp: Date.now() })));
+        // POST: Validate proposed credentials and return instructions to update env vars in Vercel
+        if (request.method === 'POST') {
+            const { newToken, newBaseUrl } = request.body || {};
+            if (!newToken || !newBaseUrl) {
+                return response.status(400).json({ error: 'Missing required fields: newToken, newBaseUrl' });
+            }
+
+            // Validate new credentials by testing them
+            try {
+                const testUrl = `${newBaseUrl}?maxRecords=1`;
+                const testRes = await fetch(testUrl, {
+                    headers: { 'Authorization': `Bearer ${newToken}` }
+                });
+
+                if (!testRes.ok) {
+                    return response.status(400).json({ error: 'Invalid Airtable credentials. Please verify token and base URL.' });
+                }
+            } catch (err) {
+                return response.status(400).json({ error: 'Failed to validate new credentials: ' + err.message });
+            }
+
+            // Return success with instructions to update environment variables
+            return response.status(200).json({
+                success: true,
+                message: 'Credentials validated successfully',
+                instructions: 'Please update the following environment variables in Vercel:\n' +
+                             `AIRTABLE_API_TOKEN=${newToken}\n` +
+                             `AIRTABLE_BASE_URL=${newBaseUrl}\n\n` +
+                             'After updating, redeploy the application.',
+                newToken,
+                newBaseUrl
+            });
+        }
+
+        return response.status(405).json({ error: 'Method not allowed' });
+
+    } catch (error) {
+        console.error('Config API Error:', error);
+        return response.status(500).json({ error: 'Internal server error: ' + error.message });
+    }
 }
