@@ -2,6 +2,7 @@
 export default async function handler(request, response) {
     const AIRTABLE_TOKEN = process.env.AIRTABLE_API_TOKEN;
     const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    const AIRTABLE_BASE_URL = process.env.AIRTABLE_BASE_URL || 'https://api.airtable.com/v0/appvf5cnySuHpWua4/tblCXb53fbuDTHt0E';
 
     if (!AIRTABLE_TOKEN) {
         return response.status(500).json({ error: { message: "Configuration Error: Airtable API Token is not set on the server." } });
@@ -11,7 +12,6 @@ export default async function handler(request, response) {
     }
 
     const { username, telegramId, otp, newPassword } = request.body;
-    const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0/appgOPuIvNQ1eMYQw/tbls64uNeAgvXrZge';
 
     async function sendTelegramMessage(chatId, text) {
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
