@@ -78,22 +78,6 @@
                 </div>
             </header>
             <main class="dashboard">
-                <section class="card" id="configSection" style="display: none;">
-                    <h2 class="card-title">⚙️ Airtable Configuration (God Only)</h2>
-                    <p class="login-subtitle" style="margin-bottom: 1rem;">Update Airtable credentials. These are stored as Vercel Environment Variables. No values are stored in the website code.</p>
-                    <form id="updateConfigForm" autocomplete="off">
-                        <div class="form-group">
-                            <label for="newAirtableToken" class="form-label">New Airtable Personal Access Token</label>
-                            <input type="text" id="newAirtableToken" class="form-input" placeholder="patXXXXXXXXXXXXXX.XXXXXXXXXX" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="newAirtableBaseUrl" class="form-label">New Airtable Base URL</label>
-                            <input type="text" id="newAirtableBaseUrl" class="form-input" placeholder="https://api.airtable.com/v0/appXXXXXX/tblXXXXXX" required>
-                        </div>
-                        <button type="submit" class="btn-primary"><span>Validate & Show Update Steps</span></button>
-                    </form>
-                    <div id="configInstructions" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; line-height: 1.6;"></div>
-                </section>
                 <section class="card">
                     <h2 class="card-title">Create Account</h2>
                     <form id="createUserForm" autocomplete="off">
