@@ -2,13 +2,13 @@
 export default async function handler(request, response) {
     const AIRTABLE_TOKEN = process.env.AIRTABLE_API_TOKEN;
     const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    const AIRTABLE_BASE_URL = process.env.AIRTABLE_BASE_URL || 'https://api.airtable.com/v0/appvf5cnySuHpWua4/tblCXb53fbuDTHt0E';
 
     if (!AIRTABLE_TOKEN || !TELEGRAM_BOT_TOKEN) {
         return response.status(500).json({ error: { message: "Server is not configured correctly." } });
     }
 
     const { username, password, otp } = request.body;
-    const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0/appgOPuIvNQ1eMYQw/tbls64uNeAgvXrZge';
 
     // Helper functions
     async function sendTelegramMessage(chatId, text) {
