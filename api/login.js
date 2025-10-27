@@ -1,12 +1,16 @@
-// NineX - Secure 2FA Login API (v1)
+// NineX - Secure 2FA Login API (v2 - Dynamic URL Construction)
 export default async function handler(request, response) {
     const AIRTABLE_TOKEN = process.env.AIRTABLE_API_TOKEN;
     const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-    const AIRTABLE_BASE_URL = process.env.AIRTABLE_BASE_URL || 'https://api.airtable.com/v0/appvf5cnySuHpWua4/tblCXb53fbuDTHt0E';
+    const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+    const AIRTABLE_TABLE_ID = process.env.AIRTABLE_TABLE_ID;
 
-    if (!AIRTABLE_TOKEN || !TELEGRAM_BOT_TOKEN) {
-        return response.status(500).json({ error: { message: "Server is not configured correctly." } });
+    if (!AIRTABLE_TOKEN || !TELEGRAM_BOT_TOKEN || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_ID) {
+        return response.status(500).json({ error: { message: "Server is not configured correctly. Missing environment variables." } });
     }
+
+    // Construct the base URL dynamically from environment variables
+    const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`;
 
     const { username, password, otp } = request.body;
 
