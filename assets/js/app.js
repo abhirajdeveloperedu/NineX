@@ -100,7 +100,11 @@ class NineXAdminPanel {
         }
     }
 
-    init() {
+    async init() {
+        // Load BASE_URL from server env via /api/config before any calls
+        if (window.loadRuntimeConfig) {
+            await window.loadRuntimeConfig();
+        }
         this.setupEventListeners();
         this.checkExistingSession();
     }
@@ -112,20 +116,34 @@ class NineXAdminPanel {
         };
         if (!url.startsWith('/api/')) {
             fetchOptions.headers['x-airtable-url'] = url;
-            url = this.config.API.PROXY_URL;
+            url = this.config.API.BASE_URL ? this.config.API.PROXY_URL : url; // if BASE_URL not loaded yet, allow direct (will fail gracefully)
         }
         if (options.body) { fetchOptions.body = JSON.stringify(options.body); }
 
-        try {
-            const response = await fetch(url, fetchOptions);
-            const data = await response.json().catch(() => ({ error: { message: `Server returned status ${response.status}. Could not parse response.` } }));
-            if (!response.ok) {
-                throw new Error(data.error?.message || `An unknown server error occurred. (Status: ${response.status})`);
+        let attempts = 0;
+        while (true) {
+            attempts++;
+            try {
+                const response = await fetch(url, fetchOptions);
+                if (response.status === 429 && attempts < 4) {
+                    // Backoff based on Retry-After or fixed 1000ms
+                    const ra = parseFloat(response.headers.get('Retry-After'));
+                    const delayMs = isFinite(ra) ? Math.max(1000, ra * 1000) : 1000 * attempts;
+                    await new Promise(r => setTimeout(r, delayMs));
+                    continue;
+                }
+                const data = await response.json().catch(() => ({ error: { message: `Server returned status ${response.status}. Could not parse response.` } }));
+                if (!response.ok) {
+                    throw new Error(data.error?.message || `An unknown server error occurred. (Status: ${response.status})`);
+                }
+                return data;
+            } catch (error) {
+                if (attempts >= 4) {
+                    console.error('SecureFetch Error:', error);
+                    throw error;
+                }
+                await new Promise(r => setTimeout(r, 500 * attempts));
             }
-            return data;
-        } catch (error) {
-            console.error('SecureFetch Error:', error);
-            throw error;
         }
     }
 
