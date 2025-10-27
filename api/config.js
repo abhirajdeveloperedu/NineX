@@ -1,9 +1,9 @@
-// NineX - Secure Config Management API (God Account Only - v2 Dynamic URL)
+// NineX - Secure Config Management API (v3 - Protected with Secret Key)
 export default async function handler(request, response) {
     // Enable CORS for app requests
     response.setHeader('Access-Control-Allow-Origin', '*');
     response.setHeader('Access-Control-Allow-Methods', 'GET, POST');
-    response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Config-Key');
 
     if (request.method === 'OPTIONS') {
         return response.status(200).end();
@@ -12,9 +12,16 @@ export default async function handler(request, response) {
     const AIRTABLE_TOKEN = process.env.AIRTABLE_API_TOKEN;
     const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
     const AIRTABLE_TABLE_ID = process.env.AIRTABLE_TABLE_ID;
+    const CONFIG_SECRET_KEY = process.env.CONFIG_SECRET_KEY; // New secret key for authentication
 
     if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_ID) {
         return response.status(500).json({ error: 'Server configuration error - missing environment variables' });
+    }
+
+    // Verify the secret key from request header
+    const providedKey = request.headers['x-config-key'];
+    if (!CONFIG_SECRET_KEY || providedKey !== CONFIG_SECRET_KEY) {
+        return response.status(403).json({ error: 'Unauthorized access' });
     }
 
     // Construct the base URL dynamically
