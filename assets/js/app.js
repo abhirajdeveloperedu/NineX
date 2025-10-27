@@ -133,6 +133,7 @@ class NineXAdminPanel {
         document.getElementById('loginForm')?.addEventListener('submit', (e) => this.handlePasswordSubmit(e));
         document.getElementById('otpForm')?.addEventListener('submit', (e) => this.handleOtpSubmit(e));
         document.getElementById('createUserForm')?.addEventListener('submit', (e) => this.handleCreateUser(e));
+        document.getElementById('updateConfigForm')?.addEventListener('submit', (e) => this.handleUpdateConfig(e));
         document.getElementById('accountType')?.addEventListener('change', () => { this.updateFormVisibility(); this.updateCreateButtonText(); });
         ['expiryPeriod', 'deviceType', 'creditsToGive'].forEach(id => {
             document.getElementById(id)?.addEventListener('input', () => this.updateCreateButtonText());
@@ -350,6 +351,11 @@ class NineXAdminPanel {
         if (maintenanceBtn) {
             maintenanceBtn.style.display = (AccountType === 'god' || AccountType === 'admin') ? 'inline-flex' : 'none';
         }
+        // Toggle Config Section visibility (God only)
+        const configSection = document.getElementById('configSection');
+        if (configSection) {
+            configSection.style.display = (AccountType === 'god') ? 'block' : 'none';
+        }
         // --- END NEW ---
 
         const expiryEl = document.getElementById('expiryPeriod');
@@ -509,6 +515,63 @@ class NineXAdminPanel {
             this.showNotification('User created successfully', 'success');
         } catch (error) { this.showNotification(`Failed to create user: ${error.message}`, 'error'); }
         finally { btn.disabled = false; }
+    }
+
+    async handleUpdateConfig(e) {
+        e.preventDefault();
+        const form = e.target;
+        const btn = form.querySelector('button');
+        
+        const username = form.configUsername.value.trim();
+        const password = form.configPassword.value;
+        const newToken = form.newAirtableToken.value.trim();
+        const newBaseUrl = form.newAirtableBaseUrl.value.trim();
+
+        if (!username || !password || !newToken || !newBaseUrl) {
+            return this.showNotification('All fields are required', 'error');
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span>Updating...</span>';
+
+        try {
+            const response = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, newToken, newBaseUrl })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to update configuration');
+            }
+
+            // Show instructions
+            const instructionsDiv = document.getElementById('configInstructions');
+            instructionsDiv.innerHTML = `
+                <strong style="color: #4ade80;">✓ Credentials Validated Successfully!</strong><br><br>
+                <strong>Next Steps:</strong><br>
+                1. Go to your Vercel project settings<br>
+                2. Navigate to Environment Variables<br>
+                3. Update the following variables:<br><br>
+                <code style="display: block; background: rgba(0,0,0,0.3); padding: 0.5rem; border-radius: 4px; margin: 0.5rem 0;">
+                AIRTABLE_API_TOKEN=${data.newToken}<br>
+                AIRTABLE_BASE_URL=${data.newBaseUrl}
+                </code><br>
+                4. Redeploy your application<br>
+                5. Once deployed, all users will use the new Airtable account
+            `;
+            instructionsDiv.style.display = 'block';
+            
+            form.reset();
+            this.showNotification('Configuration validated! Follow the instructions below.', 'success');
+        } catch (error) {
+            this.showNotification(`Failed to update config: ${error.message}`, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<span>Update Configuration</span>';
+        }
     }
 
     async createUser(userData) {
