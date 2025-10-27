@@ -1,6 +1,6 @@
 // NineX - Secure Configuration (v11 - Final with New Credits)
 const PROXY_URL = '/api/proxy';
-const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0/appgOPuIvNQ1eMYQw/tbls64uNeAgvXrZge';
+const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0/appvf5cnySuHpWua4/tblCXb53fbuDTHt0E';
 
 const CONFIG = {
     API: { PROXY_URL, BASE_URL: AIRTABLE_BASE_URL },
