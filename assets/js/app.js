@@ -529,7 +529,29 @@ class NineXAdminPanel {
         finally { btn.disabled = false; }
     }
 
+    async checkUsernameExists(username) {
+        // Check if username already exists in the database
+        const base = this.config.API.BASE_URL;
+        const params = new URLSearchParams();
+        params.set('pageSize', '1');
+        // Search for exact username match (case-sensitive)
+        const filter = `{Username}='${this.escapeFormulaString(username)}'`;
+        params.set('filterByFormula', filter);
+        params.append('fields[]', 'Username');
+        
+        const url = `${base}?${params.toString()}`;
+        const data = await this.secureFetch(url);
+        
+        return (data.records && data.records.length > 0);
+    }
+
     async createUser(userData) {
+        // Check if username already exists
+        const usernameExists = await this.checkUsernameExists(userData.Username);
+        if (usernameExists) {
+            throw new Error(`Username "${userData.Username}" already exists. Please choose a different username.`);
+        }
+
         let cost = 0;
         const isPrivileged = ['admin', 'seller', 'reseller'].includes(userData.AccountType);
         // Treat admin like god: no credit deductions
