@@ -640,17 +640,44 @@ class NineXAdminPanel {
         ].join('|');
     }
 
+    // **** THIS IS THE UPDATED FUNCTION ****
     async fetchPageRecords(pageNumber) {
         const base = this.config.API.BASE_URL;
         const params = new URLSearchParams();
         params.set('pageSize', String(Math.min(this.rowsPerPage, 100)));
         const filter = this.buildFilterFormula(true);
         if (filter) params.set('filterByFormula', filter);
-        // Server-side sort for username options (az/za). For latest/oldest we'll sort within the page client-side.
-        if (this.sortOption === 'az' || this.sortOption === 'za') {
-            params.set('sort[0][field]', 'Username');
-            params.set('sort[0][direction]', this.sortOption === 'az' ? 'asc' : 'desc');
+
+        // --- UPDATED Server-Side Sort Logic ---
+        // Set sort field and direction based on sortOption
+        switch (this.sortOption) {
+            case 'latest':
+                params.set('sort[0][field]', 'createdTime');
+                params.set('sort[0][direction]', 'desc');
+                break;
+            case 'oldest':
+                params.set('sort[0][field]', 'createdTime');
+                params.set('sort[0][direction]', 'asc');
+                break;
+            case 'az':
+                params.set('sort[0][field]', 'Username');
+                params.set('sort[0][direction]', 'asc');
+                break;
+            case 'za':
+                params.set('sort[0][field]', 'Username');
+                params.set('sort[0][direction]', 'desc');
+                break;
+            case 'expiry_desc': // New option
+                params.set('sort[0][field]', 'Expiry');
+                params.set('sort[0][direction]', 'desc');
+                break;
+            default:
+                // Default to latest if option is unknown
+                params.set('sort[0][field]', 'createdTime');
+                params.set('sort[0][direction]', 'desc');
         }
+        // --- END UPDATED Logic ---
+
         const offsetToken = this.pageOffsets[pageNumber] || undefined; // undefined for page 1
         if (offsetToken) params.set('offset', offsetToken);
 
@@ -664,15 +691,14 @@ class NineXAdminPanel {
             this.pageOffsets[pageNumber + 1] = null;
         }
 
-        // Page-level client sort for latest/oldest using record.createdTime
-        if (this.sortOption === 'latest' || this.sortOption === 'oldest') {
-            const dir = this.sortOption === 'latest' ? -1 : 1;
-            this.currentPageRecords.sort((a, b) => (new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime()) * dir);
-        }
-
+        // --- REMOVED OLD CLIENT-SIDE SORT ---
+        // The client-side sort logic that was here has been removed,
+        // as the server is now handling all sorting.
+        
         // Update page info with a temporary total if we don't have real total yet
         this.updatePageInfoServer();
     }
+    // **** END OF UPDATED FUNCTION ****
 
     resetPagingAndReload() {
         this.pageOffsets = [];
