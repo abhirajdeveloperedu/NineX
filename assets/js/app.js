@@ -17,7 +17,7 @@ class NineXAdminPanel {
         this.currentPage = 1;
         this.rowsPerPage = 50;
         this.searchQuery = '';
-        this.sortOption = 'latest';
+        this.sortOption = 'expiry_desc'; // **** THIS IS THE UPDATED LINE ****
         // Server-side paging helpers
         this.pageOffsets = []; // page index -> offset token for that page
         this.totalCount = 0; // total count for current filter
@@ -310,7 +310,7 @@ class NineXAdminPanel {
         const btn = form.querySelector('button');
         const otp = form.otp.value.trim();
         const newPassword = form.newPasswordReset.value;
-        if (!otp || !newPassword) return this.showResetError('OTP and new password are required.');
+        if (!otp || !newPassword) return this.showError('OTP and new password are required.');
         
         btn.disabled = true; btn.querySelector('span').textContent = 'Resetting...';
 
@@ -640,7 +640,7 @@ class NineXAdminPanel {
         ].join('|');
     }
 
-    // **** THIS IS THE UPDATED FUNCTION ****
+    // **** THIS IS THE FUNCTION FROM THE PREVIOUS STEP ****
     async fetchPageRecords(pageNumber) {
         const base = this.config.API.BASE_URL;
         const params = new URLSearchParams();
