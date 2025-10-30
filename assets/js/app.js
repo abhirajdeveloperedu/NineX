@@ -631,9 +631,14 @@ class NineXAdminPanel {
             const newOwed = currentOwed + paymentAmount;
             await this.secureFetch(this.config.API.BASE_URL, {
                 method: 'PATCH',
-                body: { records: [{ id: this.currentUser.recordId, fields: { AmountOwed: newOwed } }] }
+                body: { records: [{ id: this.currentUser.recordId, fields: { AmountOwed: newOwed, PaymentStatus: 'Unpaid' } }] }
             });
             this.currentUser.AmountOwed = newOwed;
+            // Update badge display
+            const amountOwedEl = document.getElementById('userAmountOwed');
+            if (amountOwedEl) {
+                amountOwedEl.textContent = `₹${newOwed}`;
+            }
         }
         
         if (cost > 0) {
