@@ -1,60 +1,83 @@
-// NineX - Secure Configuration (v11 - Final with New Credits)
-const PROXY_URL = '/api/proxy';
-const AIRTABLE_BASE_URL = 'https://api.airtable.com/v0/appvf5cnySuHpWua4/tblCXb53fbuDTHt0E';
+// NineX - Secure Config Management API (v3 - Protected with Secret Key)
+export default async function handler(request, response) {
+    // Enable CORS for app requests
+    response.setHeader('Access-Control-Allow-Origin', '*');
+    response.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+    response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Config-Key');
 
-const CONFIG = {
-    API: { PROXY_URL, BASE_URL: AIRTABLE_BASE_URL },
-    SECURITY: { SESSION_TIMEOUT: 3600000 },
-    HIERARCHY: {
-        PERMISSIONS: {
-            god: ['create_all', 'create_admin', 'create_seller', 'create_reseller', 'create_user'],
-            admin: ['create_seller', 'create_reseller', 'create_user'],
-            seller: ['create_reseller', 'create_user'],
-            reseller: ['create_user']
-        }
-    },
-    CREDITS: {
-        // UPDATED PRICING TO MATCH NEW REQUIREMENTS
-        PRICING: {
-            '240': 1,        // 10 days (single)
-            '480': 2,        // 20 days (single)
-            '720': 3,        // 30 days (single)
-            // Admin/God only options (short durations + Never)
-            '0.08333': 0.5,  // 5 minutes
-            '1': 1,          // 1 hour
-            '24': 2,         // 1 day
-            '9999': 100
-        },
-        DEVICE_MULTIPLIER: {
-            'single': 1,
-            'double': 2,
-            'unlimited': 4 
-        }
-    },
-    PAYMENT: {
-        // Payment calculation: Per credit = ₹75
-        PRICE_PER_CREDIT: 75,
-        // Package pricing
-        PACKAGES: {
-            '240': { credits: 1, price: 75 },    // 10 days = 1 credit = ₹75
-            '480': { credits: 2, price: 150 },   // 20 days = 2 credits = ₹150
-            '720': { credits: 3, price: 225 }    // 30 days = 3 credits = ₹225
-        }
+    if (request.method === 'OPTIONS') {
+        return response.status(200).end();
     }
-};
 
-function validateSession() {
-    const session = localStorage.getItem('ninex_session');
-    if (!session) return null;
+    const AIRTABLE_TOKEN = process.env.AIRTABLE_API_TOKEN;
+    const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+    const AIRTABLE_TABLE_ID = process.env.AIRTABLE_TABLE_ID;
+    const CONFIG_SECRET_KEY = process.env.CONFIG_SECRET_KEY; // New secret key for authentication
+
+    if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_ID) {
+        return response.status(500).json({ error: 'Server configuration error - missing environment variables' });
+    }
+
+    // Verify the secret key from request header
+    const providedKey = request.headers['x-config-key'];
+    if (!CONFIG_SECRET_KEY || providedKey !== CONFIG_SECRET_KEY) {
+        return response.status(403).json({ error: 'Unauthorized access' });
+    }
+
+    // Construct the base URL dynamically
+    const AIRTABLE_BASE_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`;
+
     try {
-        const data = JSON.parse(atob(session));
-        if (Date.now() - data.timestamp > CONFIG.SECURITY.SESSION_TIMEOUT) {
-            localStorage.removeItem('ninex_session'); return null;
+        // GET: Return current config (for app to fetch)
+        if (request.method === 'GET') {
+            const configData = `${AIRTABLE_TOKEN}\n${AIRTABLE_BASE_URL}`;
+            return response.status(200).send(configData);
         }
-        return data;
-    } catch (e) { localStorage.removeItem('ninex_session'); return null; }
-}
 
-function createSession(userData) {
-    localStorage.setItem('ninex_session', btoa(JSON.stringify({ user: userData, timestamp: Date.now() })));
+        // POST: Validate proposed credentials and return instructions to update env vars in Vercel
+        if (request.method === 'POST') {
+            const { newToken, newBaseId, newTableId } = request.body || {};
+            if (!newToken || !newBaseId || !newTableId) {
+                return response.status(400).json({ error: 'Missing required fields: newToken, newBaseId, newTableId' });
+            }
+
+            // Construct the full URL for validation
+            const newBaseUrl = `https://api.airtable.com/v0/${newBaseId}/${newTableId}`;
+
+            // Validate new credentials by testing them
+            try {
+                const testUrl = `${newBaseUrl}?maxRecords=1`;
+                const testRes = await fetch(testUrl, {
+                    headers: { 'Authorization': `Bearer ${newToken}` }
+                });
+
+                if (!testRes.ok) {
+                    return response.status(400).json({ error: 'Invalid Airtable credentials. Please verify token, base ID, and table ID.' });
+                }
+            } catch (err) {
+                return response.status(400).json({ error: 'Failed to validate new credentials: ' + err.message });
+            }
+
+            // Return success with instructions to update environment variables
+            return response.status(200).json({
+                success: true,
+                message: 'Credentials validated successfully',
+                instructions: 'Please update the following environment variables in Vercel:\n' +
+                             `AIRTABLE_API_TOKEN=${newToken}\n` +
+                             `AIRTABLE_BASE_ID=${newBaseId}\n` +
+                             `AIRTABLE_TABLE_ID=${newTableId}\n\n` +
+                             'After updating, redeploy the application.',
+                newToken,
+                newBaseId,
+                newTableId,
+                newBaseUrl
+            });
+        }
+
+        return response.status(405).json({ error: 'Method not allowed' });
+
+    } catch (error) {
+        console.error('Config API Error:', error);
+        return response.status(500).json({ error: 'Internal server error: ' + error.message });
+    }
 }
