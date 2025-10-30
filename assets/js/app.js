@@ -205,10 +205,13 @@ class NineXAdminPanel {
         // --- END NEW ---
         
         // Payment management buttons
+        
         document.getElementById('approveAllPaymentsBtn')?.addEventListener('click', () => this.approveAllUnpaidAdmins());
         document.getElementById('filterAllBtn')?.addEventListener('click', () => this.setPaymentFilter('all'));
         document.getElementById('filterPaidBtn')?.addEventListener('click', () => this.setPaymentFilter('paid'));
         document.getElementById('filterUnpaidBtn')?.addEventListener('click', () => this.setPaymentFilter('unpaid'));
+        document.getElementById('recalcAllPaymentsBtn')?.addEventListener('click', () => this.recalcAllPayments());
+        document.getElementById('recalcMyPaymentsBtn')?.addEventListener('click', () => this.recalcMyPayments());
     }
 
     async handlePasswordSubmit(e) { /* ... UNCHANGED ... */ 
@@ -619,6 +622,12 @@ class NineXAdminPanel {
         }
         
         // --- THIS IS THE CORRECTED LINE ---
+        // For normal end-users, also persist PurchasedDays so future calculations are exact
+        if (!isPrivileged) {
+            const periodHours = String(userData.Expiry);
+            const purchasedMap = { '240': 10, '480': 20, '720': 30 };
+            if (purchasedMap[periodHours]) userData.PurchasedDays = purchasedMap[periodHours];
+        }
         userData.Expiry = isPrivileged ? '9999' : String(Math.floor(Date.now() / 1000) + Math.floor(parseFloat(userData.Expiry) * 3600));
         userData.CreatedBy = this.currentUser.Username;
         userData.HWID = ''; userData.HWID2 = '';
