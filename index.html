@@ -101,9 +101,9 @@
                         <div class="stat-item"><div class="stat-number" id="unpaid30">0</div><div class="stat-label">Unpaid 30 Days</div></div>
                         <div class="stat-item"><div class="stat-number" id="unpaidAmount">₹0</div><div class="stat-label">Total Unpaid</div></div>
                     </div>
-                    <div style="display:flex; gap:0.5rem; margin-top: 1rem;">
-                        <button class="btn-primary" onclick="app.loadUsers()"><span>Refresh</span></button>
-                        <button class="btn-secondary" id="clearUnpaidBtn" style="display:none;"><span>Clear Unpaid (God)</span></button>
+                    <div style="display:flex; gap:0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                        <button class="btn-primary" onclick="app.loadUsers()" style="flex: 1; min-width: 200px;"><span>Refresh</span></button>
+                        <button class="btn-secondary" id="clearUnpaidBtn" style="display:none; flex: 1; min-width: 200px; background: var(--success); color: white;"><span>Clear Unpaid</span></button>
                     </div>
                 </section>
             </main>
