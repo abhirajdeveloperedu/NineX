@@ -197,6 +197,8 @@ class NineXAdminPanel {
         document.getElementById('extendAllUsersBtn')?.addEventListener('click', () => this.extendAllUsers());
         // God: Clear unpaid button
         document.getElementById('clearUnpaidBtn')?.addEventListener('click', () => this.clearUnpaidForAdmin());
+        // GOD: scope dropdown change
+        document.getElementById('adminScopeSelect')?.addEventListener('change', () => { this.updateStats().catch(()=>{}); });
         
         // --- NEW ---
         // Admin/God: Maintenance Mode button
@@ -375,6 +377,16 @@ class NineXAdminPanel {
         if (clearUnpaidBtn) {
             clearUnpaidBtn.style.display = (AccountType === 'god') ? 'block' : 'none';
             console.log('Clear Unpaid Button visibility set for:', AccountType, '-> display:', clearUnpaidBtn.style.display);
+        }
+        // Toggle Admin scope row (GOD only) and populate list
+        const scopeRow = document.getElementById('adminScopeRow');
+        if (scopeRow) {
+            if (AccountType === 'god') {
+                scopeRow.style.display = 'block';
+                this.populateAdminScopeDropdown().catch(()=>{});
+            } else {
+                scopeRow.style.display = 'none';
+            }
         }
         // --- END NEW ---
 
@@ -967,8 +979,17 @@ class NineXAdminPanel {
         const unpaidFilter = "AND({AccountType}='user', {PaymentStatus}!='paid')";
         if (filter) filter = `AND(${filter}, ${unpaidFilter})`; else filter = unpaidFilter;
 
-        // GOD view: include all creators (admins + their sellers/resellers) so downstream users are counted too
-        // No additional CreatedBy restriction needed here.
+        // GOD view: if admin scope selected, restrict to that admin + sellers/resellers
+        if (this.currentUser?.AccountType === 'god') {
+            const scopedAdmin = this.getSelectedAdminScope();
+            if (scopedAdmin) {
+                const tree = await this.fetchCreatorsTreeForAdmin(scopedAdmin);
+                if (tree.length > 0) {
+                    const createdByClause = `OR(${tree.map(a=>`{CreatedBy}='${this.escapeFormulaString(a)}'`).join(',')})`;
+                    filter = `AND(${filter}, ${createdByClause})`;
+                }
+            }
+        }
 
         params.set('filterByFormula', filter);
         params.append('fields[]', 'PurchasedDays');
@@ -1044,6 +1065,35 @@ class NineXAdminPanel {
         return names;
     }
 
+    async populateAdminScopeDropdown() {
+        const select = document.getElementById('adminScopeSelect');
+        if (!select) return;
+        // Preserve current value if possible
+        const current = select.value;
+        select.innerHTML = '<option value="">All Admins</option>';
+        const admins = await this.fetchAdminUsernames();
+        admins.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name; opt.textContent = name;
+            select.appendChild(opt);
+        });
+        // restore selection if exists
+        if (current && admins.includes(current)) {
+            select.value = current;
+        } else if (!current && admins.length > 0) {
+            // default to the first admin for GOD clarity
+            select.value = admins[0];
+        }
+        // trigger stats refresh after population
+        this.updateStats().catch(()=>{});
+    }
+
+    getSelectedAdminScope() {
+        const el = document.getElementById('adminScopeSelect');
+        if (!el) return '';
+        return el.value || '';
+    }
+
     // Collect admin's subtree creators: [admin, its sellers, resellers created by admin or those sellers]
     async fetchCreatorsTreeForAdmin(adminName) {
         const base = this.config.API.BASE_URL;
@@ -1082,8 +1132,11 @@ class NineXAdminPanel {
 
     async clearUnpaidForAdmin() {
         if (this.currentUser?.AccountType !== 'god') { this.showNotification('Only GOD can clear unpaid.', 'error'); return; }
-        const target = prompt('Enter ADMIN username to clear their unpaid users as PAID:');
-        if (!target) return;
+        let target = this.getSelectedAdminScope();
+        if (!target) {
+            target = prompt('Enter ADMIN username to clear their unpaid users as PAID (or select from dropdown):');
+            if (!target) return;
+        }
         const base = this.config.API.BASE_URL;
         const params = new URLSearchParams();
         params.set('pageSize', '100');
