@@ -103,10 +103,27 @@
                         <div class="stat-item"><div class="stat-number" id="expiredUsers">0</div><div class="stat-label">Expired Users</div></div>
                         <div class="stat-item"><div class="stat-number" id="resellerCount">0</div><div class="stat-label">Resellers</div></div>
                     </div>
+                    
+                    <!-- God payment stats -->
                     <div class="stats-grid" id="paymentStatsGrid" style="display: none; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
                         <div class="stat-item" style="background: rgba(245, 158, 11, 0.08);"><div class="stat-number" id="totalOwed" style="color: var(--warning);">₹0</div><div class="stat-label">To Collect</div></div>
                         <div class="stat-item" style="background: rgba(16, 185, 129, 0.08);"><div class="stat-number" id="totalPaid" style="color: var(--success);">₹0</div><div class="stat-label">Collected</div></div>
                     </div>
+                    
+                    <!-- Admin payment breakdown -->
+                    <div id="adminPaymentBreakdown" style="display: none; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        <h3 style="color: var(--primary-gold); font-size: 1rem; margin-bottom: 1rem;">Your Sales Breakdown</h3>
+                        <div class="stats-grid">
+                            <div class="stat-item"><div class="stat-number" id="admin10DaySales">0</div><div class="stat-label">10 Day Sales</div></div>
+                            <div class="stat-item"><div class="stat-number" id="admin20DaySales">0</div><div class="stat-label">20 Day Sales</div></div>
+                            <div class="stat-item"><div class="stat-number" id="admin30DaySales">0</div><div class="stat-label">30 Day Sales</div></div>
+                        </div>
+                        <div class="stats-grid" style="margin-top: 1rem;">
+                            <div class="stat-item" style="background: rgba(245, 158, 11, 0.08);"><div class="stat-number" id="adminTotalOwed" style="color: var(--warning);">₹0</div><div class="stat-label">You Owe</div></div>
+                            <div class="stat-item" style="background: rgba(16, 185, 129, 0.08);"><div class="stat-number" id="adminTotalPaid" style="color: var(--success);">₹0</div><div class="stat-label">You Paid</div></div>
+                        </div>
+                    </div>
+                    
                     <button class="btn-primary" onclick="app.loadUsers()" style="margin-top: 1rem;"><span>Refresh</span></button>
                 </section>
             </main>
