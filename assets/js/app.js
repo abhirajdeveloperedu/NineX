@@ -664,17 +664,9 @@ class NineXAdminPanel {
         const filter = this.buildFilterFormula(true);
         if (filter) params.set('filterByFormula', filter);
 
-        // --- UPDATED Server-Side Sort Logic ---
-        // Set sort field and direction based on sortOption
+        // --- Server-Side Sort Logic (avoid non-existent fields) ---
+        // For latest/oldest we will sort client-side using record.createdTime meta
         switch (this.sortOption) {
-            case 'latest':
-                params.set('sort[0][field]', 'createdTime');
-                params.set('sort[0][direction]', 'desc');
-                break;
-            case 'oldest':
-                params.set('sort[0][field]', 'createdTime');
-                params.set('sort[0][direction]', 'asc');
-                break;
             case 'az':
                 params.set('sort[0][field]', 'Username');
                 params.set('sort[0][direction]', 'asc');
@@ -683,16 +675,15 @@ class NineXAdminPanel {
                 params.set('sort[0][field]', 'Username');
                 params.set('sort[0][direction]', 'desc');
                 break;
-            case 'expiry_desc': // New option
+            case 'expiry_desc':
                 params.set('sort[0][field]', 'Expiry');
                 params.set('sort[0][direction]', 'desc');
                 break;
             default:
-                // Default to latest if option is unknown
-                params.set('sort[0][field]', 'createdTime');
-                params.set('sort[0][direction]', 'desc');
+                // no server sort; we'll sort by createdTime client-side
+                break;
         }
-        // --- END UPDATED Logic ---
+        // --- END Logic ---
 
         const offsetToken = this.pageOffsets[pageNumber] || undefined; // undefined for page 1
         if (offsetToken) params.set('offset', offsetToken);
@@ -707,10 +698,13 @@ class NineXAdminPanel {
             this.pageOffsets[pageNumber + 1] = null;
         }
 
-        // --- REMOVED OLD CLIENT-SIDE SORT ---
-        // The client-side sort logic that was here has been removed,
-        // as the server is now handling all sorting.
-        
+        // Client-side sort for options that rely on record.createdTime meta
+        if (this.sortOption === 'latest') {
+            this.currentPageRecords.sort((a,b)=> new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
+        } else if (this.sortOption === 'oldest') {
+            this.currentPageRecords.sort((a,b)=> new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime());
+        }
+
         // Update page info with a temporary total if we don't have real total yet
         this.updatePageInfoServer();
     }
