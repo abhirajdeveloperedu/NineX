@@ -370,6 +370,11 @@ class NineXAdminPanel {
         if (maintenanceBtn) {
             maintenanceBtn.style.display = (AccountType === 'god' || AccountType === 'admin') ? 'inline-flex' : 'none';
         }
+        // Toggle Clear Unpaid button visibility (GOD only)
+        const clearUnpaidBtn = document.getElementById('clearUnpaidBtn');
+        if (clearUnpaidBtn) {
+            clearUnpaidBtn.style.display = (AccountType === 'god') ? 'inline-flex' : 'none';
+        }
         // --- END NEW ---
 
         const expiryEl = document.getElementById('expiryPeriod');
