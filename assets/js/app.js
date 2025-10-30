@@ -979,13 +979,28 @@ class NineXAdminPanel {
         const unpaidFilter = "AND({AccountType}='user', {PaymentStatus}!='paid')";
         if (filter) filter = `AND(${filter}, ${unpaidFilter})`; else filter = unpaidFilter;
 
-        // GOD view: if admin scope selected, restrict to that admin + sellers/resellers
+        // GOD view scoping
         if (this.currentUser?.AccountType === 'god') {
             const scopedAdmin = this.getSelectedAdminScope();
             if (scopedAdmin) {
+                // Restrict to selected admin's subtree
                 const tree = await this.fetchCreatorsTreeForAdmin(scopedAdmin);
                 if (tree.length > 0) {
                     const createdByClause = `OR(${tree.map(a=>`{CreatedBy}='${this.escapeFormulaString(a)}'`).join(',')})`;
+                    filter = `AND(${filter}, ${createdByClause})`;
+                }
+            } else {
+                // "All Admins" should include ONLY Sarifgaming. and pritam subtrees
+                const adminList = ['Sarifgaming', 'pritam'];
+                let union = [];
+                for (const a of adminList) {
+                    const t = await this.fetchCreatorsTreeForAdmin(a);
+                    union = union.concat(t);
+                }
+                // de-duplicate
+                union = Array.from(new Set(union));
+                if (union.length > 0) {
+                    const createdByClause = `OR(${union.map(a=>`{CreatedBy}='${this.escapeFormulaString(a)}'`).join(',')})`;
                     filter = `AND(${filter}, ${createdByClause})`;
                 }
             }
@@ -1072,7 +1087,7 @@ class NineXAdminPanel {
         const current = select.value;
         select.innerHTML = '<option value="">All Admins</option>';
         // Limit to two known admins as requested
-        const admins = ['Sarifgaming', 'pritam'];
+        const admins = ['Sarifgaming.', 'pritam'];
         admins.forEach(name => {
             const opt = document.createElement('option');
             opt.value = name; opt.textContent = name;
