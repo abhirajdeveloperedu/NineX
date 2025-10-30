@@ -605,10 +605,9 @@ class NineXAdminPanel {
         if (this.currentUser.AccountType === 'admin' && !isPrivileged) {
             const period = userData.Expiry; // This is the period in hours before conversion
             const device = userData.Device;
-            const { PAYMENT } = this.config;
             
             // Get base price from package
-            const packagePrice = PAYMENT.PACKAGES[period]?.price || 0;
+            const packagePrice = this.config.PAYMENT?.PACKAGES[period]?.price || 0;
             const deviceMultiplier = this.config.CREDITS.DEVICE_MULTIPLIER[device] || 1;
             paymentAmount = packagePrice * deviceMultiplier;
         }
