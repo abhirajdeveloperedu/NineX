@@ -967,14 +967,8 @@ class NineXAdminPanel {
         const unpaidFilter = "AND({AccountType}='user', {PaymentStatus}!='paid')";
         if (filter) filter = `AND(${filter}, ${unpaidFilter})`; else filter = unpaidFilter;
 
-        // For GOD view: show unpaid coming from admins only
-        if (this.currentUser?.AccountType === 'god') {
-            const admins = await this.fetchAdminUsernames();
-            if (admins.length > 0) {
-                const createdByClause = `OR(${admins.map(a=>`{CreatedBy}='${this.escapeFormulaString(a)}'`).join(',')})`;
-                filter = `AND(${filter}, ${createdByClause})`;
-            }
-        }
+        // GOD view: include all creators (admins + their sellers/resellers) so downstream users are counted too
+        // No additional CreatedBy restriction needed here.
 
         params.set('filterByFormula', filter);
         params.append('fields[]', 'PurchasedDays');
@@ -1050,6 +1044,42 @@ class NineXAdminPanel {
         return names;
     }
 
+    // Collect admin's subtree creators: [admin, its sellers, resellers created by admin or those sellers]
+    async fetchCreatorsTreeForAdmin(adminName) {
+        const base = this.config.API.BASE_URL;
+        const creators = new Set([adminName]);
+        // 1) Sellers created by admin
+        const sellers = await this.queryUsernamesByTypeAndCreator('seller', adminName);
+        sellers.forEach(s => creators.add(s));
+        // 2) Resellers created by admin directly
+        const resellersByAdmin = await this.queryUsernamesByTypeAndCreator('reseller', adminName);
+        resellersByAdmin.forEach(r => creators.add(r));
+        // 3) Resellers created by each seller
+        for (const s of sellers) {
+            const resellersBySeller = await this.queryUsernamesByTypeAndCreator('reseller', s);
+            resellersBySeller.forEach(r => creators.add(r));
+        }
+        return Array.from(creators);
+    }
+
+    async queryUsernamesByTypeAndCreator(type, createdBy) {
+        const base = this.config.API.BASE_URL;
+        const params = new URLSearchParams();
+        params.set('pageSize', '100');
+        const filter = `AND({AccountType}='${this.escapeFormulaString(type)}',{CreatedBy}='${this.escapeFormulaString(createdBy)}')`;
+        params.set('filterByFormula', filter);
+        params.append('fields[]', 'Username');
+        let url = `${base}?${params.toString()}`;
+        const names = [];
+        let guard = 0;
+        while (true) {
+            const data = await this.secureFetch(url);
+            for (const r of (data.records||[])) { if (r.fields?.Username) names.push(String(r.fields.Username)); }
+            if (data.offset && guard < 50) { const u = new URL(url); u.searchParams.set('offset', data.offset); url = u.toString(); guard++; } else { break; }
+        }
+        return names;
+    }
+
     async clearUnpaidForAdmin() {
         if (this.currentUser?.AccountType !== 'god') { this.showNotification('Only GOD can clear unpaid.', 'error'); return; }
         const target = prompt('Enter ADMIN username to clear their unpaid users as PAID:');
@@ -1057,7 +1087,10 @@ class NineXAdminPanel {
         const base = this.config.API.BASE_URL;
         const params = new URLSearchParams();
         params.set('pageSize', '100');
-        const filter = `AND({AccountType}='user',{PaymentStatus}!='paid',{CreatedBy}='${this.escapeFormulaString(target)}')`;
+        // Include admin and their sellers/resellers as possible creators
+        const tree = await this.fetchCreatorsTreeForAdmin(target);
+        const createdByClause = `OR(${tree.map(n=>`{CreatedBy}='${this.escapeFormulaString(n)}'`).join(',')})`;
+        const filter = `AND({AccountType}='user',{PaymentStatus}!='paid',${createdByClause})`;
         params.set('filterByFormula', filter);
         params.append('fields[]', 'Username');
         let url = `${base}?${params.toString()}`;
