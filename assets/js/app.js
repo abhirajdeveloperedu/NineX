@@ -373,7 +373,8 @@ class NineXAdminPanel {
         // Toggle Clear Unpaid button visibility (GOD only)
         const clearUnpaidBtn = document.getElementById('clearUnpaidBtn');
         if (clearUnpaidBtn) {
-            clearUnpaidBtn.style.display = (AccountType === 'god') ? 'inline-flex' : 'none';
+            clearUnpaidBtn.style.display = (AccountType === 'god') ? 'block' : 'none';
+            console.log('Clear Unpaid Button visibility set for:', AccountType, '-> display:', clearUnpaidBtn.style.display);
         }
         // --- END NEW ---
 
