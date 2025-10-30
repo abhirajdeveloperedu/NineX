@@ -124,6 +124,10 @@
                             <div class="stat-item" style="background: rgba(245, 158, 11, 0.08);"><div class="stat-number" id="adminTotalOwed" style="color: var(--warning);">₹0</div><div class="stat-label">You Owe</div></div>
                             <div class="stat-item" style="background: rgba(16, 185, 129, 0.08);"><div class="stat-number" id="adminTotalPaid" style="color: var(--success);">₹0</div><div class="stat-label">You Paid</div></div>
                         </div>
+                        <div style="margin-top: 1rem;">
+                            <h4 style="color: var(--text-secondary); margin-bottom: 0.5rem;">Unpaid Users Under You</h4>
+                            <div id="adminUnpaidList"></div>
+                        </div>
                     </div>
                     
                     <button class="btn-primary" onclick="app.loadUsers()" style="margin-top: 1rem;"><span>Refresh</span></button>
