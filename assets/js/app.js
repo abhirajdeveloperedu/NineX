@@ -413,6 +413,11 @@ class NineXAdminPanel {
         if (adminPaymentBreakdown) {
             adminPaymentBreakdown.style.display = (AccountType === 'admin') ? 'block' : 'none';
         }
+        // Toggle recalculation buttons
+        const recalcAllBtn = document.getElementById('recalcAllPaymentsBtn');
+        if (recalcAllBtn) recalcAllBtn.style.display = (AccountType === 'god') ? 'inline-flex' : 'none';
+        const recalcMyBtn = document.getElementById('recalcMyPaymentsBtn');
+        if (recalcMyBtn) recalcMyBtn.style.display = (AccountType === 'admin') ? 'inline-flex' : 'none';
         // --- END NEW ---
 
         const expiryEl = document.getElementById('expiryPeriod');
@@ -1338,6 +1343,174 @@ class NineXAdminPanel {
 
     // ============ PAYMENT MANAGEMENT FUNCTIONS ============
     
+    /**
+     * Compute sale amount for an end-user record based on PurchasedDays or inferred from createdTime→Expiry.
+     */
+    computeSaleAmount(record) {
+        const f = record.fields || {};
+        // Only end-user accounts count
+        if (['admin', 'seller', 'reseller'].includes(f.AccountType)) return 0;
+        const device = f.Device || 'single';
+        const mult = this.config.CREDITS.DEVICE_MULTIPLIER[device] || 1;
+
+        let days = parseInt(f.PurchasedDays || 0, 10);
+        if (!days || isNaN(days)) {
+            // Infer from createdTime → Expiry
+            const createdTime = record.createdTime ? new Date(record.createdTime).getTime() / 1000 : null;
+            const expiry = parseInt(f.Expiry, 10);
+            if (createdTime && expiry && expiry !== 9999) {
+                const durDays = Math.round((expiry - createdTime) / 86400);
+                // Snap to nearest of 10, 20, 30
+                const options = [10, 20, 30];
+                let nearest = 10;
+                let best = Infinity;
+                for (const opt of options) {
+                    const d = Math.abs(durDays - opt);
+                    if (d < best) { best = d; nearest = opt; }
+                }
+                days = nearest;
+            }
+        }
+        if (!days) return 0;
+        // Map days to base price
+        const dayToKey = { 10: '240', 20: '480', 30: '720' };
+        const pack = this.config.PAYMENT?.PACKAGES[dayToKey[days]];
+        const base = pack?.price || (days === 10 ? 75 : days === 20 ? 150 : days === 30 ? 225 : 0);
+        return base * mult;
+    }
+
+    /**
+     * Render the admin's unpaid users list with per-user amounts
+     */
+    renderAdminUnpaidList(items, total) {
+        const container = document.getElementById('adminUnpaidList');
+        if (!container) return;
+        if (!items || items.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary);">No users found under you.</p>';
+            return;
+        }
+        let rows = items.map(it => `<tr><td>${it.Username}</td><td>${it.Device}</td><td>${it.PurchasedDays || it.InferredDays || '-'}</td><td>₹${it.Amount}</td></tr>`).join('');
+        container.innerHTML = `
+            <table class="table"><thead><tr><th>User</th><th>Device</th><th>Days</th><th>Amount</th></tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr><td colspan="3" style="text-align:right;font-weight:700;">Total</td><td style="font-weight:800;">₹${total}</td></tr></tfoot>
+            </table>`;
+    }
+
+    /**
+     * Admin: Recalculate my payments by scanning users I created.
+     */
+    async recalcMyPayments() {
+        if (this.currentUser.AccountType !== 'admin') {
+            return this.showNotification('Only admin can recalc their payments.', 'error');
+        }
+        try {
+            const base = this.config.API.BASE_URL;
+            const params = new URLSearchParams();
+            params.set('pageSize', '100');
+            params.set('filterByFormula', `{CreatedBy}='${this.escapeFormulaString(this.currentUser.Username)}'`);
+            params.append('fields[]', 'Username');
+            params.append('fields[]', 'AccountType');
+            params.append('fields[]', 'Device');
+            params.append('fields[]', 'Expiry');
+            params.append('fields[]', 'PurchasedDays');
+
+            let url = `${base}?${params.toString()}`;
+            let guard = 0; let total = 0; const list = [];
+            while (true) {
+                const data = await this.secureFetch(url);
+                const recs = data.records || [];
+                for (const r of recs) {
+                    const amt = this.computeSaleAmount(r);
+                    if (amt > 0) {
+                        total += amt;
+                        list.push({
+                            Username: r.fields.Username || '',
+                            Device: r.fields.Device || 'single',
+                            PurchasedDays: r.fields.PurchasedDays,
+                            Amount: amt
+                        });
+                    }
+                }
+                if (data.offset && guard < 200) {
+                    const u = new URL(url); u.searchParams.set('offset', data.offset); url = u.toString(); guard++;
+                } else break;
+            }
+
+            // Update my admin record
+            const fields = { AmountOwed: total, PaymentStatus: total > 0 ? 'Unpaid' : 'Paid' };
+            await this.secureFetch(this.config.API.BASE_URL, { method: 'PATCH', body: { records: [{ id: this.currentUser.recordId, fields }] } });
+            this.currentUser.AmountOwed = total;
+            const owedEl = document.getElementById('userAmountOwed'); if (owedEl) owedEl.textContent = `₹${total}`;
+
+            // Render list
+            this.renderAdminUnpaidList(list, total);
+            this.showNotification('Recalculated your payments.', 'success');
+        } catch (e) {
+            this.showNotification(`Failed to recalc: ${e.message}`, 'error');
+        }
+    }
+
+    /**
+     * God: Recalculate payments for all admins.
+     */
+    async recalcAllPayments() {
+        if (this.currentUser.AccountType !== 'god') {
+            return this.showNotification('Only god can recalc all payments.', 'error');
+        }
+        if (!confirm('Recalculate AmountOwed for all admins?')) return;
+        try {
+            const base = this.config.API.BASE_URL;
+            // Fetch admins first
+            const p = new URLSearchParams();
+            p.set('pageSize', '100');
+            p.set('filterByFormula', `{AccountType}='admin'`);
+            p.append('fields[]', 'Username');
+            let urlAdmins = `${base}?${p.toString()}`;
+            const adminRecords = [];
+            let guardA = 0;
+            while (true) {
+                const dataA = await this.secureFetch(urlAdmins);
+                (dataA.records || []).forEach(r => adminRecords.push(r));
+                if (dataA.offset && guardA < 200) { const u = new URL(urlAdmins); u.searchParams.set('offset', dataA.offset); urlAdmins = u.toString(); guardA++; } else break;
+            }
+
+            // For each admin, sum users they created
+            const updates = [];
+            for (const admin of adminRecords) {
+                const adminName = admin.fields.Username;
+                if (!adminName) continue;
+                const params = new URLSearchParams();
+                params.set('pageSize', '100');
+                params.set('filterByFormula', `{CreatedBy}='${this.escapeFormulaString(adminName)}'`);
+                params.append('fields[]', 'Username');
+                params.append('fields[]', 'AccountType');
+                params.append('fields[]', 'Device');
+                params.append('fields[]', 'Expiry');
+                params.append('fields[]', 'PurchasedDays');
+                let url = `${base}?${params.toString()}`;
+                let guard = 0; let total = 0;
+                while (true) {
+                    const data = await this.secureFetch(url);
+                    const recs = data.records || [];
+                    for (const r of recs) total += this.computeSaleAmount(r);
+                    if (data.offset && guard < 200) { const u = new URL(url); u.searchParams.set('offset', data.offset); url = u.toString(); guard++; } else break;
+                }
+                updates.push({ id: admin.id, fields: { AmountOwed: total, PaymentStatus: total > 0 ? 'Unpaid' : 'Paid' } });
+            }
+
+            // Patch in chunks
+            for (let i = 0; i < updates.length; i += 10) {
+                const batch = updates.slice(i, i + 10);
+                await this.secureFetch(base, { method: 'PATCH', body: { records: batch } });
+            }
+            this.showNotification('Recalculated payments for all admins.', 'success');
+            await this.loadUsers();
+        } catch (e) {
+            this.showNotification(`Failed to recalc all: ${e.message}`, 'error');
+        }
+    }
+
     /**
      * Calculate and display admin's payment breakdown
      */
