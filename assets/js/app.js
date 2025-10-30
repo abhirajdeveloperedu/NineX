@@ -17,7 +17,7 @@ class NineXAdminPanel {
         this.currentPage = 1;
         this.rowsPerPage = 50;
         this.searchQuery = '';
-        this.sortOption = 'expiry_desc'; // **** THIS IS THE UPDATED LINE ****
+        this.sortOption = 'latest';
         // Server-side paging helpers
         this.pageOffsets = []; // page index -> offset token for that page
         this.totalCount = 0; // total count for current filter
@@ -799,9 +799,7 @@ class NineXAdminPanel {
             } else {
                 const secondsLeft = parseInt(user.Expiry) - nowSec;
                 const daysLeft = Math.ceil(secondsLeft / 86400);
-                const totalDays = parseInt(user.PurchasedDays || 0) || daysLeft; // fallback
-                const ratio = totalDays ? `${Math.max(0, daysLeft)}/${totalDays} days` : `${Math.max(0, daysLeft)} days`;
-                expiryDisplay = `<span class=\"expiry-days\">${ratio}</span>`;
+                expiryDisplay = `<span class=\"expiry-days\">${Math.max(0, daysLeft)} days</span>`;
             }
             const purchasedInfo = this.formatPurchasedInfo(user);
             const paymentBadge = `<span class=\"status-badge ${String(user.PaymentStatus).toLowerCase() === 'paid' ? 'status-active' : 'status-expired'}\">${user.PaymentStatus || '-'}</span>`;
