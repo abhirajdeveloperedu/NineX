@@ -1071,7 +1071,8 @@ class NineXAdminPanel {
         // Preserve current value if possible
         const current = select.value;
         select.innerHTML = '<option value="">All Admins</option>';
-        const admins = await this.fetchAdminUsernames();
+        // Limit to two known admins as requested
+        const admins = ['Sarifgaming.', 'pritam'];
         admins.forEach(name => {
             const opt = document.createElement('option');
             opt.value = name; opt.textContent = name;
