@@ -195,6 +195,8 @@ class NineXAdminPanel {
         document.getElementById('resetAllKeysBtn')?.addEventListener('click', () => this.resetAllKeys());
         // Admin/God: Extend All Users button
         document.getElementById('extendAllUsersBtn')?.addEventListener('click', () => this.extendAllUsers());
+        // God: Clear unpaid button
+        document.getElementById('clearUnpaidBtn')?.addEventListener('click', () => this.clearUnpaidForAdmin());
         
         // --- NEW ---
         // Admin/God: Maintenance Mode button
@@ -563,10 +565,18 @@ class NineXAdminPanel {
             }
             if (this.currentUser.Credits < cost) throw new Error('Insufficient credits.');
         }
+        // Preserve selection before converting to epoch seconds
+        const selectedHours = userData.Expiry;
         // --- THIS IS THE CORRECTED LINE ---
-        userData.Expiry = isPrivileged ? '9999' : String(Math.floor(Date.now() / 1000) + Math.floor(parseFloat(userData.Expiry) * 3600));
+        userData.Expiry = isPrivileged ? '9999' : String(Math.floor(Date.now() / 1000) + Math.floor(parseFloat(selectedHours) * 3600));
         userData.CreatedBy = this.currentUser.Username;
         userData.HWID = ''; userData.HWID2 = '';
+        // Payment fields for normal users
+        if (!isPrivileged) {
+            userData.PaymentStatus = 'unpaid';
+            userData.PurchasedDays = this.mapHoursToPurchasedDays(selectedHours);
+            userData.PaymentDate = new Date().toISOString();
+        }
         
         // --- NEW ---
         // Ensure new user's version matches the current server state
@@ -783,11 +793,15 @@ class NineXAdminPanel {
             } else {
                 const secondsLeft = parseInt(user.Expiry) - nowSec;
                 const daysLeft = Math.ceil(secondsLeft / 86400);
-                expiryDisplay = `<span class=\"expiry-days\">${daysLeft} days</span>`;
+                const totalDays = parseInt(user.PurchasedDays || 0) || daysLeft; // fallback
+                const ratio = totalDays ? `${Math.max(0, daysLeft)}/${totalDays} days` : `${Math.max(0, daysLeft)} days`;
+                expiryDisplay = `<span class=\"expiry-days\">${ratio}</span>`;
             }
+            const purchasedInfo = this.formatPurchasedInfo(user);
+            const paymentBadge = `<span class=\"status-badge ${String(user.PaymentStatus).toLowerCase() === 'paid' ? 'status-active' : 'status-expired'}\">${user.PaymentStatus || '-'}</span>`;
             // Only show credits for seller and reseller; not for admin
             const showCredits = (user.AccountType === 'seller' || user.AccountType === 'reseller');
-            row.innerHTML = `<td>${user.Username || ''}</td><td>${user.Password || ''}</td><td>${user.AccountType || 'user'}</td><td>${showCredits ? (user.Credits || 0) : '-'}</td><td>${expiryDisplay}</td><td>${user.Device || 'Single'}</td><td>${user.HWID ? 'SET' : 'NONE'}</td><td>${user.CreatedBy || ''}</td><td><span class=\"status-badge ${isExpired ? 'status-expired' : 'status-active'}\">${isExpired ? 'Expired' : 'Active'}</span></td><td class=\"action-buttons\">${creditButton}<button onclick=\"app.resetHWID('${id}', '${user.Username}')\" class=\"action-btn btn-warning\">Reset HWID</button><button onclick=\"app.deleteUser('${id}', '${user.Username}')\" class=\"action-btn btn-danger\">Delete</button></td>`;
+            row.innerHTML = `<td>${user.Username || ''}</td><td>${user.Password || ''}</td><td>${user.AccountType || 'user'}</td><td>${showCredits ? (user.Credits || 0) : '-'}</td><td>${expiryDisplay}</td><td>${purchasedInfo}</td><td>${paymentBadge}</td><td>${user.Device || 'Single'}</td><td>${user.HWID ? 'SET' : 'NONE'}</td><td>${user.CreatedBy || ''}</td><td><span class=\"status-badge ${isExpired ? 'status-expired' : 'status-active'}\">${isExpired ? 'Expired' : 'Active'}</span></td><td class=\"action-buttons\">${creditButton}<button onclick=\"app.resetHWID('${id}', '${user.Username}')\" class=\"action-btn btn-warning\">Reset HWID</button><button onclick=\"app.deleteUser('${id}', '${user.Username}')\" class=\"action-btn btn-danger\">Delete</button></td>`;
         });
     }
 
@@ -945,41 +959,53 @@ class NineXAdminPanel {
     async updateUserCredits(recordId, newCredits) { /* ... UNCHANGED ... */ 
         await this.secureFetch(this.config.API.BASE_URL, { method: 'PATCH', body: { records: [{ id: recordId, fields: { Credits: newCredits } }] } });
     }
-    async updateStats() { /* now fetch lightweight pages to compute accurate counts */ 
+    async updateStats() { /* compute unpaid breakdown for current role */ 
         const base = this.config.API.BASE_URL;
         const params = new URLSearchParams();
         params.set('pageSize', '100');
-        const accessOnly = this.buildFilterFormula(false); // exclude search for global stats
-        if (accessOnly) params.set('filterByFormula', accessOnly);
-        params.append('fields[]', 'Expiry');
+        // Access scope
+        let filter = this.buildFilterFormula(false);
+        // Restrict to normal users and unpaid only for counting; we'll count by day
+        const unpaidFilter = "AND({AccountType}='user', {PaymentStatus}!='paid')";
+        if (filter) filter = `AND(${filter}, ${unpaidFilter})`; else filter = unpaidFilter;
+
+        // For GOD view: show unpaid coming from admins only
+        if (this.currentUser?.AccountType === 'god') {
+            const admins = await this.fetchAdminUsernames();
+            if (admins.length > 0) {
+                const createdByClause = `OR(${admins.map(a=>`{CreatedBy}='${this.escapeFormulaString(a)}'`).join(',')})`;
+                filter = `AND(${filter}, ${createdByClause})`;
+            }
+        }
+
+        params.set('filterByFormula', filter);
+        params.append('fields[]', 'PurchasedDays');
+        params.append('fields[]', 'PaymentStatus');
         params.append('fields[]', 'AccountType');
+        params.append('fields[]', 'CreatedBy');
         let url = `${base}?${params.toString()}`;
-        let total = 0, active = 0, reseller = 0;
+
+        let u10 = 0, u20 = 0, u30 = 0;
         let guard = 0;
-        const nowSec = Math.floor(Date.now() / 1000);
         while (true) {
             const data = await this.secureFetch(url);
             const recs = data.records || [];
-            total += recs.length;
             for (const r of recs) {
-                const f = r.fields || {};
-                const isActive = f.Expiry === '9999' || parseInt(f.Expiry) > nowSec;
-                if (isActive) active++;
-                if (f.AccountType === 'reseller') reseller++;
+                const d = parseInt(r.fields?.PurchasedDays || 0);
+                if (d === 10) u10++; else if (d === 20) u20++; else if (d === 30) u30++;
             }
             if (data.offset && guard < 100) {
                 const u = new URL(url);
                 u.searchParams.set('offset', data.offset);
                 url = u.toString();
                 guard++;
-            } else {
-                break;
-            }
+            } else { break; }
         }
-        document.getElementById('totalUsers').textContent = total;
-        document.getElementById('activeUsers').textContent = active;
-        document.getElementById('expiredUsers').textContent = total - active;
-        document.getElementById('resellerCount').textContent = reseller;
+        const totalAmount = (u10*75) + (u20*150) + (u30*225);
+        document.getElementById('unpaid10').textContent = u10;
+        document.getElementById('unpaid20').textContent = u20;
+        document.getElementById('unpaid30').textContent = u30;
+        document.getElementById('unpaidAmount').textContent = `₹${totalAmount}`;
     }
     logout() { /* ... UNCHANGED ... */ 
         localStorage.removeItem('ninex_session'); window.location.reload(); 
@@ -993,6 +1019,65 @@ class NineXAdminPanel {
         const el = document.getElementById('notification');
         el.textContent = message; el.className = `notification ${type} show`;
         setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    mapHoursToPurchasedDays(hoursStr) {
+        const h = String(hoursStr);
+        if (h === '240') return 10;
+        if (h === '480') return 20;
+        if (h === '720') return 30;
+        return 0;
+    }
+    formatPurchasedInfo(user) {
+        const days = user.PurchasedDays || 0;
+        const date = user.PaymentDate ? new Date(user.PaymentDate) : null;
+        const dateStr = date ? date.toLocaleDateString('en-IN') : '-';
+        if (!days) return dateStr;
+        return `${days} days • ${dateStr}`;
+    }
+    async fetchAdminUsernames() {
+        const base = this.config.API.BASE_URL;
+        const params = new URLSearchParams();
+        params.set('pageSize', '100');
+        params.set('filterByFormula', "{AccountType}='admin'");
+        params.append('fields[]', 'Username');
+        let url = `${base}?${params.toString()}`;
+        const names = [];
+        let guard = 0;
+        while (true) {
+            const data = await this.secureFetch(url);
+            for (const r of (data.records||[])) { if (r.fields?.Username) names.push(String(r.fields.Username)); }
+            if (data.offset && guard < 50) { const u = new URL(url); u.searchParams.set('offset', data.offset); url = u.toString(); guard++; } else { break; }
+        }
+        return names;
+    }
+
+    async clearUnpaidForAdmin() {
+        if (this.currentUser?.AccountType !== 'god') { this.showNotification('Only GOD can clear unpaid.', 'error'); return; }
+        const target = prompt('Enter ADMIN username to clear their unpaid users as PAID:');
+        if (!target) return;
+        const base = this.config.API.BASE_URL;
+        const params = new URLSearchParams();
+        params.set('pageSize', '100');
+        const filter = `AND({AccountType}='user',{PaymentStatus}!='paid',{CreatedBy}='${this.escapeFormulaString(target)}')`;
+        params.set('filterByFormula', filter);
+        params.append('fields[]', 'Username');
+        let url = `${base}?${params.toString()}`;
+        const toUpdate = [];
+        let guard = 0;
+        while (true) {
+            const data = await this.secureFetch(url);
+            for (const r of (data.records||[])) { toUpdate.push({ id: r.id }); }
+            if (data.offset && guard < 200) { const u = new URL(url); u.searchParams.set('offset', data.offset); url = u.toString(); guard++; } else { break; }
+        }
+        if (toUpdate.length === 0) { this.showNotification('No unpaid users found for that admin.', 'success'); return; }
+        const chunkSize = 10;
+        for (let i=0;i<toUpdate.length;i+=chunkSize){
+            const batch = toUpdate.slice(i,i+chunkSize).map(r=>({id:r.id, fields:{ PaymentStatus: 'paid' }}));
+            await this.secureFetch(base, { method: 'PATCH', body: { records: batch } });
+        }
+        this.showNotification(`Cleared unpaid for ${toUpdate.length} user(s) of ${target}.`, 'success');
+        await this.loadUsers();
     }
 
     // ---
