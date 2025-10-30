@@ -404,6 +404,12 @@ class NineXAdminPanel {
         if (paymentStatsGrid) {
             paymentStatsGrid.style.display = (AccountType === 'god') ? 'grid' : 'none';
         }
+        
+        // Show admin payment breakdown for admin only
+        const adminPaymentBreakdown = document.getElementById('adminPaymentBreakdown');
+        if (adminPaymentBreakdown) {
+            adminPaymentBreakdown.style.display = (AccountType === 'admin') ? 'block' : 'none';
+        }
         // --- END NEW ---
 
         const expiryEl = document.getElementById('expiryPeriod');
@@ -846,7 +852,7 @@ class NineXAdminPanel {
             if (user.AccountType === 'admin') {
                 const paymentStatus = user.PaymentStatus || 'Unpaid';
                 const badgeClass = paymentStatus === 'Paid' ? 'payment-paid' : 'payment-unpaid';
-                paymentBadge = `<span class="payment-badge ${badgeClass}">${paymentStatus}</span>`;
+                paymentBadge = `<span class="payment-badge ${badgeClass}">${paymentStatus.toUpperCase()}</span>`;
             }
             
             // Username with payment badge
@@ -1115,6 +1121,11 @@ class NineXAdminPanel {
             if (owedEl) owedEl.textContent = `₹${totalOwed.toFixed(0)}`;
             if (paidEl) paidEl.textContent = `₹${totalPaid.toFixed(0)}`;
         }
+        
+        // Update admin payment breakdown (Admin only)
+        if (this.currentUser.AccountType === 'admin') {
+            await this.updateAdminPaymentBreakdown();
+        }
     }
     logout() { /* ... UNCHANGED ... */ 
         localStorage.removeItem('ninex_session'); window.location.reload(); 
@@ -1317,6 +1328,84 @@ class NineXAdminPanel {
     }
 
     // ============ PAYMENT MANAGEMENT FUNCTIONS ============
+    
+    /**
+     * Calculate and display admin's payment breakdown
+     */
+    async updateAdminPaymentBreakdown() {
+        try {
+            const base = this.config.API.BASE_URL;
+            const params = new URLSearchParams();
+            params.set('pageSize', '100');
+            
+            // Filter for users created by this admin
+            const filter = `{CreatedBy}='${this.escapeFormulaString(this.currentUser.Username)}'`;
+            params.set('filterByFormula', filter);
+            params.append('fields[]', 'Expiry');
+            params.append('fields[]', 'Device');
+            params.append('fields[]', 'AccountType');
+            
+            let url = `${base}?${params.toString()}`;
+            let sales10 = 0, sales20 = 0, sales30 = 0;
+            let totalAmount = 0;
+            let guard = 0;
+            const nowSec = Math.floor(Date.now() / 1000);
+            
+            while (true) {
+                const data = await this.secureFetch(url);
+                const recs = data.records || [];
+                
+                for (const r of recs) {
+                    const f = r.fields || {};
+                    // Skip privileged accounts
+                    if (['admin', 'seller', 'reseller'].includes(f.AccountType)) continue;
+                    
+                    const expiry = parseInt(f.Expiry);
+                    const device = f.Device || 'single';
+                    
+                    // Calculate days from expiry (approximate)
+                    if (expiry !== 9999 && expiry > 0) {
+                        const daysTotal = Math.ceil((expiry - nowSec) / 86400);
+                        const deviceMult = this.config.CREDITS.DEVICE_MULTIPLIER[device] || 1;
+                        
+                        // Categorize by approximate package
+                        if (daysTotal <= 15) {
+                            sales10++;
+                            totalAmount += 75 * deviceMult;
+                        } else if (daysTotal <= 25) {
+                            sales20++;
+                            totalAmount += 150 * deviceMult;
+                        } else {
+                            sales30++;
+                            totalAmount += 225 * deviceMult;
+                        }
+                    }
+                }
+                
+                if (data.offset && guard < 100) {
+                    const u = new URL(url);
+                    u.searchParams.set('offset', data.offset);
+                    url = u.toString();
+                    guard++;
+                } else {
+                    break;
+                }
+            }
+            
+            // Update UI
+            document.getElementById('admin10DaySales').textContent = sales10;
+            document.getElementById('admin20DaySales').textContent = sales20;
+            document.getElementById('admin30DaySales').textContent = sales30;
+            
+            const adminOwed = this.currentUser.AmountOwed || 0;
+            const adminPaid = this.currentUser.AmountPaid || 0;
+            
+            document.getElementById('adminTotalOwed').textContent = `₹${adminOwed}`;
+            document.getElementById('adminTotalPaid').textContent = `₹${adminPaid}`;
+        } catch (error) {
+            console.error('Failed to update admin payment breakdown:', error);
+        }
+    }
     
     /**
      * Toggle payment status for an admin between Paid and Unpaid
