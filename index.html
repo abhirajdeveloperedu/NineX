@@ -96,12 +96,15 @@
                 <section class="card">
                     <h2 class="card-title">Statistics</h2>
                     <div class="stats-grid">
-                        <div class="stat-item"><div class="stat-number" id="totalUsers">0</div><div class="stat-label">Total Users</div></div>
-                        <div class="stat-item"><div class="stat-number" id="activeUsers">0</div><div class="stat-label">Active Users</div></div>
-                        <div class="stat-item"><div class="stat-number" id="expiredUsers">0</div><div class="stat-label">Expired Users</div></div>
-                        <div class="stat-item"><div class="stat-number" id="resellerCount">0</div><div class="stat-label">Resellers</div></div>
+                        <div class="stat-item"><div class="stat-number" id="unpaid10">0</div><div class="stat-label">Unpaid 10 Days</div></div>
+                        <div class="stat-item"><div class="stat-number" id="unpaid20">0</div><div class="stat-label">Unpaid 20 Days</div></div>
+                        <div class="stat-item"><div class="stat-number" id="unpaid30">0</div><div class="stat-label">Unpaid 30 Days</div></div>
+                        <div class="stat-item"><div class="stat-number" id="unpaidAmount">₹0</div><div class="stat-label">Total Unpaid</div></div>
                     </div>
-                    <button class="btn-primary" onclick="app.loadUsers()" style="margin-top: 1rem;"><span>Refresh</span></button>
+                    <div style="display:flex; gap:0.5rem; margin-top: 1rem;">
+                        <button class="btn-primary" onclick="app.loadUsers()"><span>Refresh</span></button>
+                        <button class="btn-secondary" id="clearUnpaidBtn" style="display:none;"><span>Clear Unpaid (God)</span></button>
+                    </div>
                 </section>
             </main>
             <section class="table-container">
@@ -123,7 +126,7 @@
                         <thead>
                             <tr>
                                 <th>Username</th><th>Password</th><th>Type</th><th>Credits</th>
-                                <th>Expiry</th><th>Device</th><th>HWID</th><th>Created By</th>
+                                <th>Expiry</th><th>Purchased</th><th>Payment</th><th>Device</th><th>HWID</th><th>Created By</th>
                                 <th>Status</th><th>Actions</th>
                             </tr>
                         </thead>
